@@ -1,0 +1,136 @@
+:root {
+  --bg: #ecede7;
+  --ink: #1b1c1a;
+  --accent: #2a55d9;
+  --muted: #6b6d66;
+  font-family: system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.app { display: flex; flex-direction: column; min-height: 100vh; }
+
+.topbar {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  background: #fff;
+}
+
+.topbar h1 { font-size: 15px; margin: 0; font-weight: 600; }
+.topbar .source { font-size: 13px; color: var(--muted); }
+.topbar .hint { margin-left: auto; font-size: 12px; color: var(--muted); }
+
+.banner {
+  padding: 8px 20px;
+  background: #fde8e8;
+  color: #8a1c1c;
+  font-size: 13px;
+  border-bottom: 1px solid #f3c2c2;
+}
+
+.dropzone { flex: 1; position: relative; overflow: auto; }
+.dropzone[data-over='true']::after {
+  content: 'Guitar Pro 파일을 놓으세요';
+  position: absolute;
+  inset: 12px;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--accent);
+  border-radius: 8px;
+  background: rgba(42, 85, 217, 0.06);
+  color: var(--accent);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.surface { padding: 20px; background: #fff; }
+
+.toolbar {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding: 10px 20px;
+  background: #f6f6f3;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.toolbar fieldset {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.toolbar legend {
+  float: left;
+  width: 100%;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 0 4px;
+}
+
+.toolbar button {
+  font: inherit;
+  font-size: 13px;
+  padding: 5px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.toolbar button[data-active='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.toolbar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.toolbar .reset {
+  margin-left: auto;
+}
+
+.stats {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 10;
+  min-width: 230px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(20, 21, 19, 0.92);
+  color: #f4f4f0;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+}
+
+.stats table { width: 100%; border-collapse: collapse; }
+.stats th { font-weight: 500; font-size: 12px; text-align: right; color: #b9bab4; padding: 2px 0; }
+.stats thead th { text-align: right; }
+.stats tbody th { text-align: left; padding-right: 10px; }
+.stats td { text-align: right; font-size: 13px; padding: 2px 0 2px 10px; }
+.stats td.headline { font-size: 17px; font-weight: 600; }
+.stats .meta { margin: 6px 0 0; font-size: 11px; color: #b9bab4; }
+.stats .conditions { color: #8d8f88; }

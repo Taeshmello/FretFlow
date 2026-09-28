@@ -1,6 +1,7 @@
 # 의존성 / 빌드 산출물
 node_modules/
 dist/
+poc/render/public/
 build/
 .vite/
 *.tsbuildinfo
@@ -22,6 +23,10 @@ pnpm-debug.log*
 .idea/
 .vscode/
 .DS_Store
+
+# 브라우저 확인 산출물
+.playwright-mcp/
+poc-render-*.png
 
 # iOS / Capacitor (M6 이후)
 ios/App/Pods/
