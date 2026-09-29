@@ -85,6 +85,16 @@ export function toggleHit(score: Score, cursor: Cursor, piece: DrumPiece): Chang
   return { ops, label: 'add hit' };
 }
 
+/** Drums: normal → accent → ghost → normal for one piece on the cursor beat. */
+export function cycleHitDynamic(score: Score, cursor: Cursor, piece: DrumPiece): Change | null {
+  const hit = here(score, cursor).beat?.hits?.find(h => h.piece === piece);
+  if (!hit) {
+    return null;
+  }
+  const next = hit.dynamic === undefined ? 'accent' : hit.dynamic === 'accent' ? 'ghost' : undefined;
+  return { ops: [setOp(score, hit.id, ['dynamic'], next)], label: 'drum dynamic' };
+}
+
 /** The beat before the cursor in the same track, across bar lines. */
 function previousBeat(score: Score, cursor: Cursor): Beat | undefined {
   const track = score.tracks.find(t => t.id === cursor.trackId);

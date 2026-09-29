@@ -1,5 +1,5 @@
 import * as alphaTab from '@coderline/alphatab';
-import { DRUM_ORDER, DRUM_PIECES, isFretted, type Beat, type DrumPiece, type Id, type MasterBar, type Note, type NoteEffects, type Score, type Track } from '@fretflow/score-model';
+import { DRUM_ORDER, DRUM_PIECES, isFretted, type Beat, type DrumHit, type DrumPiece, type Id, type MasterBar, type Note, type NoteEffects, type Score, type Track } from '@fretflow/score-model';
 import { toAlphaTabString } from './strings';
 
 const at = alphaTab.model;
@@ -164,9 +164,14 @@ function drumArticulations(): alphaTab.model.InstrumentArticulation[] {
   });
 }
 
-function drumNote(piece: DrumPiece): alphaTab.model.Note {
+function drumNote(piece: DrumPiece, dynamic: DrumHit['dynamic']): alphaTab.model.Note {
   const n = new at.Note();
   n.percussionArticulation = DRUM_ORDER.indexOf(piece);
+  if (dynamic === 'accent') {
+    n.accentuated = at.AccentuationType.Normal;
+  } else if (dynamic === 'ghost') {
+    n.isGhost = true;
+  }
   return n;
 }
 
@@ -243,7 +248,7 @@ function convertTrack(
             }
           }
           for (const hit of beat.hits ?? []) {
-            converted.addNote(drumNote(hit.piece));
+            converted.addNote(drumNote(hit.piece, hit.dynamic));
           }
         }
         if (staffIndex > 0) {

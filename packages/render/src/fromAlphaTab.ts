@@ -317,7 +317,8 @@ function drumBar(t: alphaTab.model.Track, i: number, mb: MasterBar, report: Repo
       if (!seen.has(piece)) {
         seen.add(piece);
         out.hits ??= [];
-        out.hits.push({ id: newId(), piece, source: 'import' });
+        const dynamic = n.isGhost ? 'ghost' : n.accentuated !== at.AccentuationType.None ? 'accent' : undefined;
+        out.hits.push({ id: newId(), piece, source: 'import', ...(dynamic ? { dynamic } : {}) });
       }
     }
     out.hits?.sort((a, c) => DRUM_ORDER.indexOf(a.piece) - DRUM_ORDER.indexOf(c.piece));

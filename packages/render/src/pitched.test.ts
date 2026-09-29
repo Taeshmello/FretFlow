@@ -75,3 +75,19 @@ describe('drums on a percussion staff', () => {
     }
   });
 });
+
+describe('drum dynamics', () => {
+  it('keeps accents and ghost notes through alphaTab and Guitar Pro', () => {
+    const src = drumScore();
+    const hits = src.tracks[0].bars[0].beats[0].hits!;
+    hits[0].dynamic = 'accent';
+    hits[1].dynamic = 'ghost';
+    const { score: model } = toAlphaTab(src, { staffMode: 'score' }, new alphaTab.Settings());
+    const [kick, hat] = model.tracks[0].staves[0].bars[0].voices[0].beats[0].notes;
+    expect(kick.accentuated).toBe(alphaTab.model.AccentuationType.Normal);
+    expect(hat.isGhost).toBe(true);
+    const dyn = (s: Score) => s.tracks[0].bars[0].beats[0].hits?.map(h => h.dynamic ?? 'normal');
+    expect(dyn(fromAlphaTab(model).score)).toEqual(['accent', 'ghost']);
+    expect(dyn(importFile(exportGp7(src)).score)).toEqual(['accent', 'ghost']);
+  });
+});

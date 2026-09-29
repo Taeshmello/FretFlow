@@ -429,3 +429,22 @@ describe('drum input (D-023)', () => {
     expect(execute(d, { type: 'togglePitch', pitch: 60 }, 0).score).toBe(d.score);
   });
 });
+
+describe('drum dynamics', () => {
+  it('cycles a hit through accent, ghost and normal', () => {
+    let s = run(fresh(createScore({ instrument: 'drums', bars: 1 })), [{ type: 'toggleHit', piece: 'snare' }]);
+    const dyn = () => cursorBeat(s.score, s.cursor)?.hits?.[0].dynamic;
+    s = run(s, [{ type: 'cycleHitDynamic', piece: 'snare' }]);
+    expect(dyn()).toBe('accent');
+    s = run(s, [{ type: 'cycleHitDynamic', piece: 'snare' }]);
+    expect(dyn()).toBe('ghost');
+    s = run(s, [{ type: 'cycleHitDynamic', piece: 'snare' }]);
+    expect(dyn()).toBeUndefined();
+    expect(validateScore(s.score)).toEqual([]);
+  });
+
+  it('does nothing for a piece that is not on the beat', () => {
+    const s = fresh(createScore({ instrument: 'drums', bars: 1 }));
+    expect(execute(s, { type: 'cycleHitDynamic', piece: 'kick' }, 0).score).toBe(s.score);
+  });
+});

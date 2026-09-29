@@ -113,6 +113,8 @@ export type DrumPiece =
 export interface DrumHit {
   id: Id;
   piece: DrumPiece;
+  /** Louder (accent) or softer (ghost) than a normal stroke. */
+  dynamic?: 'accent' | 'ghost';
   source: NoteSource;
 }
 

@@ -105,6 +105,9 @@ export function validateScore(score: Score): ValidationIssue[] {
           if (!(hit.piece in DRUM_PIECES)) {
             issues.push({ code: 'drumPiece', message: `unknown drum piece ${String(hit.piece)}`, id: hit.id });
           }
+          if (hit.dynamic !== undefined && hit.dynamic !== 'accent' && hit.dynamic !== 'ghost') {
+            issues.push({ code: 'drumPiece', message: `unknown drum dynamic ${String(hit.dynamic)}`, id: hit.id });
+          }
           if (pieces.has(hit.piece)) {
             issues.push({ code: 'duplicateHit', message: `${hit.piece} twice in one beat`, id: hit.id });
           }

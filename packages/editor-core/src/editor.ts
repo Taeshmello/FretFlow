@@ -89,6 +89,7 @@ export type Command =
   | { type: 'togglePitch'; pitch: number }
   | { type: 'transposeKeys'; delta: number }
   | { type: 'toggleHit'; piece: DrumPiece }
+  | { type: 'cycleHitDynamic'; piece: DrumPiece }
   | { type: 'toggleFingeringLock' }
   | { type: 'hammer' }
   | { type: 'slide' }
@@ -232,6 +233,8 @@ function run(state: EditorState, command: Command, now: number, mergeField: bool
       return commit(base, pitched.transposeKeys(score, cursor, command.delta), now);
     case 'toggleHit':
       return commit(base, pitched.toggleHit(score, cursor, command.piece), now);
+    case 'cycleHitDynamic':
+      return commit(base, pitched.cycleHitDynamic(score, cursor, command.piece), now);
     case 'toggleFingeringLock': {
       const note = cursorNote(score, cursor);
       return note ? commit(base, { ops: [setOp(score, note.id, ['fingeringLocked'], !note.fingeringLocked)], label: 'fingering lock' }, now) : base;
