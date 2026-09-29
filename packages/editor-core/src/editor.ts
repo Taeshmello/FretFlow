@@ -9,6 +9,7 @@ import * as pitched from './commands/pitched';
 import { deleteNote, enterFretDigit, placeFret, type PendingDigit } from './commands/input';
 import { advanceRight } from './commands/navigation';
 import * as rhythm from './commands/rhythm';
+import { pushOverflowOps } from './commands/overflow';
 import * as tracks from './commands/tracks';
 import { moveBeat } from './cursor';
 
@@ -127,8 +128,18 @@ function commitChange(state: EditorState, change: Change | null, now: number): E
   }
   let next = state;
   if (change.ops.length) {
-    const score = applyOps(state.score, change.ops);
-    const tx = { id: newId(), ops: change.ops, label: change.label, at: now };
+    let ops = change.ops;
+    let score = applyOps(state.score, ops);
+    if (state.settings.overflow === 'pushToNextBar') {
+      // Part of the same transaction, so one undo takes the edit and the push back.
+      const cursor = change.cursor ?? state.cursor;
+      const pushed = pushOverflowOps(score, cursor.trackId, Math.min(cursor.barIndex, state.cursor.barIndex));
+      if (pushed.length) {
+        ops = [...ops, ...pushed];
+        score = applyOps(score, pushed);
+      }
+    }
+    const tx = { id: newId(), ops, label: change.label, at: now };
     next = { ...state, score, history: record(state.history, tx, change.merge), revision: state.revision + 1 };
   }
   const cursor = clampCursor(next.score, change.cursor ?? next.cursor);

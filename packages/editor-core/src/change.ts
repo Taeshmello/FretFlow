@@ -16,9 +16,11 @@ export interface Settings {
   advanceAfterInput: boolean;
   /** Window for combining two digits into one fret. */
   digitWindowMs: number;
+  /** SPEC §5.4: warn about overfull bars, or push the extra beats into the next bar. */
+  overflow: 'warn' | 'pushToNextBar';
 }
 
-export const DEFAULT_SETTINGS: Settings = { advanceAfterInput: false, digitWindowMs: 600 };
+export const DEFAULT_SETTINGS: Settings = { advanceAfterInput: false, digitWindowMs: 600, overflow: 'warn' };
 
 /** Everything a command needs to know about the cursor position. */
 export interface Here {

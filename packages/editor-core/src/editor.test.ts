@@ -448,3 +448,30 @@ describe('drum dynamics', () => {
     expect(execute(s, { type: 'cycleHitDynamic', piece: 'kick' }, 0).score).toBe(s.score);
   });
 });
+
+describe('overflow: pushToNextBar (SPEC §5.4)', () => {
+  const push = (bars = 2) => createEditor(createScore({ bars }), { overflow: 'pushToNextBar' });
+  const shape = (s: EditorState) => s.score.tracks[0].bars.map(b => b.beats.map(x => x.duration.base).join(','));
+
+  it('moves the beats that no longer fit to the start of the next bar', () => {
+    const s = run(push(), [{ type: 'longer' }]); // first quarter becomes a half
+    // The pushed quarter takes the place of a padding rest, so bar 2 stays exactly full.
+    expect(shape(s)).toEqual(['2,4,4', '4,4,4,4']);
+    expect(s.score.tracks[0].bars.every((b, i) => barFill(b, s.score.masterBars[i]).state === 'full')).toBe(true);
+    expect(validateScore(s.score)).toEqual([]);
+  });
+
+  it('adds a bar when the last bar overflows, and undoes in one step', () => {
+    const start = push(1);
+    const s = run(start, [{ type: 'longer' }]);
+    expect(s.score.masterBars).toHaveLength(2);
+    expect(shape(s)).toEqual(['2,4,4', '4,4,4,4']);
+    expect(validateScore(s.score)).toEqual([]);
+    expect(run(s, [{ type: 'undo' }]).score).toEqual(start.score);
+  });
+
+  it('only warns by default', () => {
+    const s = run(fresh(createScore({ bars: 2 })), [{ type: 'longer' }]);
+    expect(shape(s)).toEqual(['2,4,4,4', '4,4,4,4']);
+  });
+});

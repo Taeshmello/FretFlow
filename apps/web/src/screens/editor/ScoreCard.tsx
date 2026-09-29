@@ -71,6 +71,15 @@ export function ScoreCard(p: Props) {
             Staff
           </button>
         </div>}
+        <button
+          type="button"
+          className="head-btn muted"
+          aria-pressed={editor.settings.overflow === 'pushToNextBar'}
+          title="When a bar gets too long: only highlight it, or move the extra beats into the next bar"
+          onClick={() => dispatch({ type: 'settings', settings: { overflow: editor.settings.overflow === 'warn' ? 'pushToNextBar' : 'warn' } })}
+        >
+          {editor.settings.overflow === 'warn' ? 'Overflow: warn' : 'Overflow: push to next bar'}
+        </button>
         {stringInstrument && <button
           type="button"
           className="head-btn muted"
