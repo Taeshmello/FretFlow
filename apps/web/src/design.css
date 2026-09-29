@@ -363,7 +363,7 @@
 
   .touch-context {
     display: grid;
-    grid-template-columns: 36px 1fr 36px;
+    grid-template-columns: 36px 1fr 36px auto;
     align-items: center;
     text-align: center;
     gap: 8px;
@@ -664,5 +664,71 @@
 
   .touch-context button {
     height: 26px;
+  }
+}
+
+/* Solo note guide inside the touch panel (rule-based; colours match the desktop fretboard). */
+@media (max-width: 900px) {
+  .touch-context .touch-guide-toggle {
+    width: auto;
+    padding: 0 10px;
+    font-family: inherit;
+    font-size: 12px;
+  }
+
+  .touch-guide {
+    display: grid;
+    gap: 6px;
+  }
+
+  .touch-guide p {
+    margin: 0;
+  }
+
+  .touch-guide-notes {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .guide-chip {
+    display: inline-flex;
+    flex-shrink: 0;
+    border-radius: 10px;
+    border: 1.5px solid var(--guide-color, #4285f4);
+    overflow: hidden;
+  }
+
+  .guide-chip button {
+    border: 0;
+    border-radius: 0;
+    height: 34px;
+    padding: 0 10px;
+    font-family: 'JetBrains Mono Variable', ui-monospace, monospace;
+    font-size: 13px;
+  }
+
+  .guide-chip button small {
+    color: var(--muted);
+    margin-left: 4px;
+  }
+
+  .guide-chip .guide-listen {
+    padding: 0 9px;
+    border-left: 1px solid var(--guide-color, #4285f4);
+    background: color-mix(in srgb, var(--guide-color, #4285f4) 14%, white);
+  }
+
+  .guide-chord {
+    --guide-color: #4285f4;
+  }
+
+  .guide-passing {
+    --guide-color: #e4ac31;
+  }
+
+  .guide-tension {
+    --guide-color: #dc5e54;
   }
 }

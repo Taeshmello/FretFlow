@@ -1,6 +1,8 @@
 import { cursorBeat, cursorTrack, type Command, type EditorState } from '@fretflow/editor-core';
 import { pitchName, type DurationBase } from '@fretflow/score-model';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { previewPitch } from '../../audio/preview';
+import { suggestNextNotes } from '../../ui/soloGuide';
 
 interface Props {
   editor: EditorState;
@@ -25,6 +27,8 @@ const TECHNIQUES: { label: string; command: Command }[] = [
 /** Touch controls for the score cursor at tablet and phone widths. */
 export function TouchInput({ editor, dispatch }: Props) {
   const [highFrets, setHighFrets] = useState(false);
+  const [guideOn, setGuideOn] = useState(false);
+  const guide = useMemo(() => (guideOn ? suggestNextNotes(editor.score, editor.cursor, 15) : null), [guideOn, editor.score, editor.cursor]);
   const track = cursorTrack(editor.score, editor.cursor);
   const beat = cursorBeat(editor.score, editor.cursor);
   const note = beat?.notes.find(item => item.string === editor.cursor.string);
@@ -36,7 +40,23 @@ export function TouchInput({ editor, dispatch }: Props) {
         <button type="button" onClick={() => dispatch({ type: 'moveBeat', delta: -1 })} aria-label="이전 박">‹</button>
         <span>마디 {editor.cursor.barIndex + 1} · {note ? `${pitchName(note.pitch)} · ` : ''}{editor.cursor.string}번 현{note ? ` · ${note.fret}프렛` : ''}</span>
         <button type="button" onClick={() => dispatch({ type: 'moveBeat', delta: 1 })} aria-label="다음 박">›</button>
+        <button type="button" className="touch-guide-toggle" aria-pressed={guideOn} onClick={() => setGuideOn(v => !v)}>가이드</button>
       </div>
+      {guide && (
+        <div className="touch-guide" role="group" aria-label="솔로 음 가이드">
+          <p className="muted small">규칙 기반 · 생성형 AI 아님 · {guide.message}</p>
+          <div className="touch-guide-notes">
+            {guide.notes.map(n => (
+              <span key={`${n.string}:${n.fret}`} className={`guide-chip guide-${n.kind}`}>
+                <button type="button" title={n.reason} onClick={() => dispatch({ type: 'placeFret', string: n.string, fret: n.fret })}>
+                  {n.string}번 · {n.fret} <small>{pitchName(n.pitch)}</small>
+                </button>
+                <button type="button" className="guide-listen" aria-label={`${n.string}번 현 ${n.fret}프렛 미리 듣기`} onClick={() => previewPitch(n.pitch)}>♪</button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="touch-strip" role="group" aria-label="음가">
         {DURATIONS.map(d => <button key={d.value} type="button" aria-pressed={beat?.duration.base === d.value} onClick={() => dispatch({ type: 'setDuration', base: d.value })}>{d.label}</button>)}
       </div>

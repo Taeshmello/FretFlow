@@ -2,6 +2,7 @@ import type { Command, EditorState } from '@fretflow/editor-core';
 import { cursorBeat, cursorTrack } from '@fretflow/editor-core';
 import { pitchName } from '@fretflow/score-model';
 import { useMemo, useState } from 'react';
+import { previewPitch } from '../audio/preview';
 import { suggestNextNotes } from './soloGuide';
 
 const FRETS = 15;
@@ -32,7 +33,7 @@ export function Fretboard({ editor, dispatch }: Props) {
       <div className="fb-guide-head">
         <button type="button" className="chip" aria-pressed={guideOn} onClick={() => setGuideOn(on => !on)}>솔로 음 가이드 {guideOn ? '끄기' : '켜기'}</button>
         <span className="muted small">규칙 기반 · 생성형 AI 아님</span>
-        {guideOn && <span className="muted small">{guide.message}</span>}
+        {guideOn && <span className="muted small">{guide.message} ⌥/Alt+클릭으로 미리 듣기.</span>}
       </div>
       <div className="fb-names">
         {track.tuning.map((open, i) => (
@@ -69,8 +70,8 @@ export function Fretboard({ editor, dispatch }: Props) {
                   type="button"
                   className={`fb-cell${fret === 0 ? ' is-nut' : ''}`}
                   style={{ gridColumn: fret + 1, gridRow: string }}
-                  title={`String ${string}, fret ${fret} · ${pitchName(pitch)}${hint ? ` · ${hint.reason}` : ''}`}
-                  onClick={() => dispatch({ type: 'placeFret', string, fret })}
+                  title={`String ${string}, fret ${fret} · ${pitchName(pitch)}${hint ? ` · ${hint.reason}` : ''} · ⌥/Alt+click to listen`}
+                  onClick={e => (e.altKey ? previewPitch(pitch) : dispatch({ type: 'placeFret', string, fret }))}
                 >
                   {note && <span className={`fb-dot${isCursorNote ? ' is-cursor' : ''}`}>{pitchName(pitch).replace(/-?\d+$/, '')}</span>}
                   {same && <span className="fb-ring" />}
