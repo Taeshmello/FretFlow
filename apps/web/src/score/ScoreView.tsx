@@ -1,4 +1,4 @@
-import type * as alphaTab from '@coderline/alphatab';
+import * as alphaTab from '@coderline/alphatab';
 import { beatsInRange, selectionRange, type Command, type EditorState } from '@fretflow/editor-core';
 import { beatBox, cellAt, cellBox, toAlphaTab, type Box, type Converted } from '@fretflow/render';
 import { barFill } from '@fretflow/score-model';
@@ -46,10 +46,39 @@ export function ScoreView({ api, containerRef, editor, audition, viewMode, dispa
     if (api.playbackRange) {
       clearPlaybackLoop(api);
     }
+    // renderScore reloads the MIDI and stops playback; carry on from the same tick.
+    const resumeTick = api.playerState === alphaTab.synth.PlayerState.Playing ? api.tickPosition : null;
     const converted = toAlphaTab(score, { staffMode: viewMode }, api.settings);
     convertedRef.current = converted;
     onConverted(converted);
     api.renderScore(converted.score, score.tracks.map((_, i) => i));
+    if (resumeTick !== null) {
+      // The MIDI reload finishes after the render and fires playerReady (often more than
+      // once), stopping playback each time. Resume shortly after the last of them.
+      // (api.midiLoaded would be the natural signal, but subscribing to it recurses
+      // forever inside alphaTab 1.8.4.)
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      const resume = () => {
+        off();
+        clearTimeout(giveUp);
+        if (api.playerState !== alphaTab.synth.PlayerState.Playing) {
+          api.tickPosition = resumeTick;
+          api.play();
+        }
+      };
+      const off = api.playerReady.on(() => {
+        if (timer) {
+          clearTimeout(timer);
+        }
+        timer = setTimeout(resume, 50);
+      });
+      const giveUp = setTimeout(() => {
+        off();
+        if (timer) {
+          clearTimeout(timer);
+        }
+      }, 2000);
+    }
   }, [api, score, viewMode, onConverted]);
 
   useEffect(() => {
