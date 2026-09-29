@@ -29,22 +29,28 @@ export interface PrintOptions {
 
 /**
  * PDF export = alphaTab's print layout in a new window → the browser's
- * "Save as PDF" (SPEC §9). The free-tier footer goes in as the score notice.
+ * "Save as PDF" (SPEC §9). alphaTab renders that window asynchronously from the
+ * same score object, so the free-tier footer (copyright line, hidden on screen)
+ * is left in place; the next edit builds a fresh model anyway.
  */
 export function printScore(api: alphaTab.AlphaTabApi, opts: PrintOptions): void {
   const score = api.score;
   if (!score) {
     return;
   }
-  const prevNotice = score.notices;
-  score.notices = 'Made with FretFlow';
+  score.copyright = 'Made with FretFlow';
   api.print(opts.paper === 'a4' ? '210mm' : '8.5in', {
     display: {
       staveProfile: opts.staves === 'tab' ? alphaTab.StaveProfile.Tab : alphaTab.StaveProfile.ScoreTab,
       ...(opts.range ? { startBar: opts.range[0], barCount: opts.range[1] - opts.range[0] + 1 } : {}),
     },
+    notation: {
+      elements: new Map([
+        [alphaTab.NotationElement.ScoreCopyright, true],
+        [alphaTab.NotationElement.EffectDynamics, false],
+      ]),
+    },
   });
-  score.notices = prevNotice;
 }
 
 export interface OpenedFile {

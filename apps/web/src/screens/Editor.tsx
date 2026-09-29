@@ -3,6 +3,7 @@ import type { Converted } from '@fretflow/render';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { exportAsGp, exportAsJson, exportAsMidi, printScore } from '../app/files';
 import { useEditor, type EditorStore } from '../app/store';
+import { track as trackEvent } from '../app/telemetry';
 import { isTextTarget, mapKey } from '../keymap';
 import { usePlayback } from '../player/usePlayback';
 import { ScoreView } from '../score/ScoreView';
@@ -47,6 +48,16 @@ export function Editor({ store, onBack, saveLabel, saveError }: Props) {
     playback.playPause(beat ? convertedRef.current?.beats.get(beat.id) ?? null : null);
   }, [playback, store]);
 
+  const getSynthTick = useCallback(() => api?.tickPosition ?? 0, [api]);
+  const seekSynth = useCallback(
+    (tick: number) => {
+      if (api) {
+        api.tickPosition = tick;
+      }
+    },
+    [api],
+  );
+
   const loopSelection = useCallback(() => {
     const { selection, score, cursor } = store.state;
     if (playback.state.looping) {
@@ -56,6 +67,7 @@ export function Editor({ store, onBack, saveLabel, saveError }: Props) {
     const range = selectionRange(selection ?? { anchor: { ...cursor, beatIndex: 0 }, head: { ...cursor, beatIndex: 1e9 } });
     const beats = beatsInRange(score, range);
     if (beats.length) {
+      trackEvent('loop_used', { source: 'synth' });
       playback.setLoopRange(convertedRef.current, beats[0].beat, beats[beats.length - 1].beat);
     }
   }, [playback, store]);
@@ -170,6 +182,10 @@ export function Editor({ store, onBack, saveLabel, saveError }: Props) {
             synthVolume={v => playback.update({ volume: v })}
             selectedBars={selectedBars}
             onSetTempo={bpm => dispatch({ type: 'setMasterBar', prop: 'tempo', value: bpm, barIndex: 0 })}
+            onSynthPlay={playback.playFromTick}
+            onSynthPause={playback.pause}
+            getSynthTick={getSynthTick}
+            onSynthSeek={seekSynth}
           />
         </div>
       </div>

@@ -38,6 +38,8 @@ export function useAlphaTab(scrollElement: React.RefObject<HTMLElement | null>) 
         elements: new Map([
           // We have no dynamics in the model; alphaTab would print its default "f".
           [alphaTab.NotationElement.EffectDynamics, false],
+          // Only the print layout shows the "Made with FretFlow" copyright line.
+          [alphaTab.NotationElement.ScoreCopyright, false],
           // Show "H"/"P" and "sl." so techniques are readable in the tab.
           [alphaTab.NotationElement.EffectHammerOnPullOffText, true],
           [alphaTab.NotationElement.EffectSlideText, true],

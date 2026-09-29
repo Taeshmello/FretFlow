@@ -1,6 +1,5 @@
 import {
   addAnchor,
-  AudioLoadError,
   AudioTrackPlayer,
   buildTempoMap,
   Crossfader,
@@ -16,10 +15,13 @@ import {
   type SyncMap,
 } from '@fretflow/audio-engine';
 import type { Score } from '@fretflow/score-model';
-import { sha256Hex } from '@fretflow/storage';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { persistence } from '../app/persistence';
+import { track } from '../app/telemetry';
 import { beatMapMeter, nextBarLine } from './metronomeSync';
+import { useSynthFollow } from './useSynthFollow';
+import { loadErrorMessage, pullFromCloud, pushToCloud, saveLocalAudio } from './audioSource';
+import { AudioTransport } from './AudioTransport';
 import { BeatMapControls } from './BeatMapControls';
 import { Waveform } from './Waveform';
 
@@ -29,6 +31,12 @@ interface Props {
   synthVolume: (v: number) => void;
   selectedBars: [number, number] | null;
   onSetTempo: (bpm: number) => void;
+  /** Start / stop the score synth together with the recording. */
+  onSynthPlay: (tick: number, rate: number) => void;
+  onSynthPause: () => void;
+  /** Current synth tick, for keeping it aligned with the recording. */
+  getSynthTick: () => number;
+  onSynthSeek: (tick: number) => void;
 }
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`;
@@ -37,7 +45,7 @@ const fmt = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart
  * The user's own recording (SPEC §7, D-009: kept outside the Score, never shared).
  * Slow-down uses the browser's pitch-preserving playback (see audio-engine).
  */
-export function AudioPanel({ scoreId, score, synthVolume, selectedBars, onSetTempo }: Props) {
+export function AudioPanel({ scoreId, score, synthVolume, selectedBars, onSetTempo, onSynthPlay, onSynthPause, getSynthTick, onSynthSeek }: Props) {
   const ctxRef = useRef<AudioContext | null>(null);
   const playerRef = useRef<AudioTrackPlayer | null>(null);
   const faderRef = useRef<Crossfader | null>(null);
@@ -54,6 +62,10 @@ export function AudioPanel({ scoreId, score, synthVolume, selectedBars, onSetTem
   const [loop, setLoop] = useState<LoopRegion | null>(null);
   const [mix, setMix] = useState(0);
   const [map, setMap] = useState<SyncMap>(emptySyncMap());
+  const follow = useSynthFollow(playerRef, map, getSynthTick, onSynthSeek, onSynthPause);
+  // The player's time listener is created once, so it reaches the hook through a ref.
+  const followRef = useRef(follow);
+  followRef.current = follow;
   const [error, setError] = useState<string | null>(null);
 
   function ensurePlayer(): AudioTrackPlayer {
@@ -68,8 +80,10 @@ export function AudioPanel({ scoreId, score, synthVolume, selectedBars, onSetTem
         lastTimeRef.current = t;
         if (Math.abs(t - expected) > 0.25) {
           resyncRef.current();
+          followRef.current.jumped();
         }
         setTime(t);
+        followRef.current.onAudioTime(t);
       });
       player.onState(s => setPlaying(s === 'playing'));
       metroRef.current = new Metronome(ctx, { volume: 0.7 });
@@ -99,7 +113,7 @@ export function AudioPanel({ scoreId, score, synthVolume, selectedBars, onSetTem
       const saved = maps.find(m => m.audioId === id);
       setMap(saved ? { anchors: saved.anchors, offsetMs: saved.offsetMs } : syncMapFromScore(score, 0));
     } catch (err) {
-      setError(err instanceof AudioLoadError ? { tooLarge: '100MB 이하 파일만 올릴 수 있습니다.', tooLong: '15분 이하 음원만 지원합니다.', decodeFailed: '이 파일을 재생할 수 없습니다.' }[err.code] : String(err));
+      setError(loadErrorMessage(err));
     }
   }
 
@@ -109,7 +123,10 @@ export function AudioPanel({ scoreId, score, synthVolume, selectedBars, onSetTem
     void (async () => {
       const p = await persistence(() => {});
       const id = await p.media.getPref<string>(`audio:${scoreId}`);
-      const stored = id ? await p.media.getAudio(id) : undefined;
+      let stored = id ? await p.media.getAudio(id) : undefined;
+      if (!stored && p.remote) {
+        stored = await pullFromCloud(p, scoreId).catch(() => undefined);
+      }
       if (alive && stored) {
         const cached = (await p.media.getPeaks(stored.id)) as PeakLevels | undefined;
         await loadBlob(stored.blob, stored.id, stored.name, cached);
@@ -137,35 +154,15 @@ export function AudioPanel({ scoreId, score, synthVolume, selectedBars, onSetTem
       void (async () => {
         const p = await persistence(() => {});
         await p.media.putSyncMap({ scoreId, audioId, anchors: map.anchors, offsetMs: map.offsetMs, updatedAt: Date.now() });
-        // Cloud copy only when signed in; the audio goes up once (sha256 dedupe on the server).
-        if (!p.remote) {
-          return;
-        }
-        try {
-          const stored = await p.media.getAudio(audioId);
-          if (!stored) {
-            return;
-          }
-          let remoteId = stored.remoteId;
-          if (!remoteId) {
-            remoteId = await p.remote.uploadAudio(stored.blob, stored.id, duration * 1000, stored.name);
-            await p.media.putAudio({ ...stored, remoteId });
-          }
-          await p.remote.putSyncMap(scoreId, remoteId, map.anchors, map.offsetMs);
-        } catch {
-          // Signed out, offline or score not uploaded yet: the local copy is enough for now.
-        }
+        await pushToCloud(p, scoreId, audioId, map, duration);
       })();
     }, 800);
     return () => clearTimeout(t);
   }, [map, audioId, scoreId, duration]);
 
   async function onFile(file: File) {
-    const bytes = await file.arrayBuffer();
-    const id = await sha256Hex(bytes);
-    const p = await persistence(() => {});
-    await p.media.putAudio({ id, blob: file, name: file.name, type: file.type, size: file.size, durationMs: 0 });
-    await p.media.setPref(`audio:${scoreId}`, id);
+    const id = await saveLocalAudio(await persistence(() => {}), scoreId, file);
+    track('audio_connected', {});
     await loadBlob(file, id, file.name);
   }
 
@@ -212,8 +209,13 @@ export function AudioPanel({ scoreId, score, synthVolume, selectedBars, onSetTem
   };
   useEffect(() => resyncRef.current(), [metroOn, playing, rate, map, tempo]);
 
+  useEffect(() => follow.onPlaying(playing), [playing, follow]);
+
   const player = playerRef.current;
   const applyLoop = (l: LoopRegion | null) => {
+    if (l && !loop) {
+      track('loop_used', { source: 'audio' });
+    }
     setLoop(l);
     player?.setLoop(l);
   };
@@ -233,60 +235,41 @@ export function AudioPanel({ scoreId, score, synthVolume, selectedBars, onSetTem
 
   return (
     <div className="audio-panel">
-      <div className="audio-controls">
-        <button type="button" className="tool play" onClick={() => (playing ? player?.pause() : void player?.play())}>
-          {playing ? '❚❚' : '▶'}
-        </button>
-        <span className="time">
-          {fmt(time)} / {fmt(duration)} · 마디 {currentBar}
-        </span>
-        <label className="speed" title="속도 (음높이 유지)">
-          <span>{Math.round(rate * 100)}%</span>
-          <input
-            type="range"
-            min={50}
-            max={100}
-            step={5}
-            value={Math.round(rate * 100)}
-            onChange={e => {
-              const r = Number(e.target.value) / 100;
-              setRate(r);
-              if (player) {
-                player.rate = r;
-              }
-            }}
-          />
-        </label>
-        <button type="button" className="chip" disabled={!selectedBars} onClick={() => selectedBars && applyLoop(loopFromBars(map, tempo, selectedBars[0] - 1, selectedBars[1] - 1))}>
-          선택 마디 반복
-        </button>
-        <button type="button" className="chip" disabled={!loop} onClick={() => applyLoop(null)}>
-          반복 해제
-        </button>
-        <button type="button" className="chip" aria-pressed={metroOn} onClick={() => setMetroOn(v => !v)} title="비트 맵을 따라가는 클릭">
-          메트로놈
-        </button>
-        <label className="speed" title="원음 ↔ 신스">
-          <span>원음</span>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={Math.round(mix * 100)}
-            onChange={e => {
-              const m = Number(e.target.value) / 100;
-              setMix(m);
-              faderRef.current?.setMix(m);
-            }}
-          />
-          <span>신스</span>
-        </label>
-        <span className="muted small file-name">{name}</span>
-        <label className="chip">
-          바꾸기
-          <input type="file" accept="audio/*" hidden onChange={e => e.target.files?.[0] && void onFile(e.target.files[0])} />
-        </label>
-      </div>
+      <AudioTransport
+        playing={playing}
+        label={`${fmt(time)} / ${fmt(duration)} · 마디 ${currentBar}`}
+        rate={rate}
+        onRate={r => {
+          setRate(r);
+          if (player) {
+            player.rate = r;
+          }
+        }}
+        onPlayPause={() => (playing ? player?.pause() : void player?.play())}
+        canLoopSelection={!!selectedBars}
+        onLoopSelection={() => selectedBars && applyLoop(loopFromBars(map, tempo, selectedBars[0] - 1, selectedBars[1] - 1))}
+        hasLoop={!!loop}
+        onClearLoop={() => applyLoop(null)}
+        onTogether={() => {
+          if (playing) {
+            // Pausing the recording also pauses the synth (useSynthFollow.onPlaying).
+            player?.pause();
+            return;
+          }
+          follow.start();
+          onSynthPlay(secondsToTick(map, time), rate);
+          void player?.play();
+        }}
+        metronome={metroOn}
+        onMetronome={() => setMetroOn(v => !v)}
+        mix={mix}
+        onMix={m => {
+          setMix(m);
+          faderRef.current?.setMix(m);
+        }}
+        fileName={name}
+        onFile={f => void onFile(f)}
+      />
       <Waveform
         peaks={peaks}
         duration={duration}

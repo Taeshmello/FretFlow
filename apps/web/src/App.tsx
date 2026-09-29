@@ -5,6 +5,7 @@ import { Account } from './app/Account';
 import { openFile } from './app/files';
 import { persistence, type Persistence } from './app/persistence';
 import { EditorStore } from './app/store';
+import { checkMilestones, track } from './app/telemetry';
 import { Editor } from './screens/Editor';
 import { Library } from './screens/Library';
 import { ConflictDialog, ImportReport, Tutorial } from './ui/Dialogs';
@@ -96,7 +97,10 @@ export function App() {
   function openStore(pp: Persistence, score: Score) {
     unsubscribe.current?.();
     const s = new EditorStore(score);
-    unsubscribe.current = s.onScoreChange((next, tx) => pp.saver.schedule(next, tx));
+    unsubscribe.current = s.onScoreChange((next, tx) => {
+      pp.saver.schedule(next, tx);
+      checkMilestones(next);
+    });
     setStore(s);
     window.location.hash = `#/score/${score.id}`;
     void pp.media.setPref('lastOpened', score.id);
@@ -117,6 +121,10 @@ export function App() {
       return;
     }
     await p.scores.save(score, null);
+    track('score_created', { instrument: score.tracks[0].instrument, bars: score.masterBars.length });
+    if (scores.length === 0) {
+      track('first_score', {}, 'first_score');
+    }
     openStore(p, score);
   }
 
@@ -128,6 +136,7 @@ export function App() {
     try {
       const opened = await openFile(file);
       await p.scores.save(opened.score, null);
+      track('score_imported', { source: opened.source, unsupported: opened.unsupported.size });
       openStore(p, opened.score);
       if (opened.unsupported.size) {
         setReport(opened.unsupported);
@@ -171,7 +180,14 @@ export function App() {
             }
           }}
           importError={importError}
-          account={<Account onSignedIn={() => void (p?.sync?.pullMissing().then(() => refresh(p)).catch(() => {}))} />}
+          account={
+            <Account
+              onSignedIn={() => {
+                track('signed_in');
+                void p?.sync?.pullMissing().then(() => refresh(p)).catch(() => {});
+              }}
+            />
+          }
         />
       )}
       {tutorial && (

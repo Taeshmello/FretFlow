@@ -78,6 +78,21 @@ export function usePlayback(api: alphaTab.AlphaTabApi | null) {
 
   const stop = useCallback(() => api?.stop(), [api]);
 
+  /** Start the synth at a score tick (alphaTab also uses 960 ticks per quarter), at a given speed. */
+  const playFromTick = useCallback(
+    (tick: number, speed: number) => {
+      if (!api || !api.isReadyForPlayback) {
+        return;
+      }
+      update({ speed });
+      api.playbackSpeed = speed;
+      api.tickPosition = Math.max(0, Math.round(tick));
+      api.play();
+    },
+    [api, update],
+  );
+  const pause = useCallback(() => api?.pause(), [api]);
+
   const [muted, setMuted] = useState<ReadonlySet<number>>(new Set());
   const toggleMute = useCallback(
     (trackIndex: number) => {
@@ -134,5 +149,5 @@ export function usePlayback(api: alphaTab.AlphaTabApi | null) {
     [api, update],
   );
 
-  return { state, update, playPause, stop, setLoopRange, muted, toggleMute };
+  return { state, update, playPause, stop, setLoopRange, muted, toggleMute, playFromTick, pause };
 }
