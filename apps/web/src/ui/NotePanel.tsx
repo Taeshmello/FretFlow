@@ -1,5 +1,5 @@
 import { cursorBeat, cursorNote, cursorTrack, type Command, type EditorState } from '@fretflow/editor-core';
-import { fretFor, pitchName, type BendAmount, type BendType, type DurationBase, type NoteEffects } from '@fretflow/score-model';
+import { DRUM_PIECES, fretFor, isFretted, pitchName, type BendAmount, type BendType, type DurationBase, type NoteEffects } from '@fretflow/score-model';
 import { Lock, LockOpen } from 'lucide-react';
 
 interface Props {
@@ -36,6 +36,7 @@ export function NotePanel({ editor, dispatch }: Props) {
   const note = cursorNote(score, cursor);
   const fx: NoteEffects = note?.effects ?? {};
   const d = beat?.duration;
+  const fretted = isFretted(track.instrument);
   const elsewhere = note
     ? track.tuning
         .map((_, i) => i + 1)
@@ -47,43 +48,75 @@ export function NotePanel({ editor, dispatch }: Props) {
 
   return (
     <aside className="note-panel card" aria-label="Selected note">
-      <section>
-        <h3>Selected note</h3>
-        {note ? (
-          <>
-            <p className="note-name">
-              <b>{pitchName(note.pitch)}</b>
-              <span className="mono">
-                string {note.string} · fret {note.fret}
-              </span>
+      {fretted ? (
+        <section>
+          <h3>Selected note</h3>
+          {note ? (
+            <>
+              <p className="note-name">
+                <b>{pitchName(note.pitch)}</b>
+                <span className="mono">
+                  string {note.string} · fret {note.fret}
+                </span>
+              </p>
+              <div className="lock-row">
+                {note.fingeringLocked ? <Lock size={16} /> : <LockOpen size={16} />}
+                <span>{note.fingeringLocked ? 'Fingering locked' : 'Fingering unlocked'}</span>
+                <button type="button" className="link" onClick={() => dispatch({ type: 'toggleFingeringLock' })}>
+                  {note.fingeringLocked ? 'Unlock' : 'Lock'}
+                </button>
+              </div>
+              {elsewhere.length > 0 && (
+                <>
+                  <p className="muted small">Same pitch elsewhere</p>
+                  <div className="chips">
+                    {elsewhere.map(x => (
+                      <button key={x.string} type="button" className="chip mono" onClick={() => dispatch({ type: 'placeFret', string: x.string, fret: x.fret })}>
+                        str {x.string} · fret {x.fret}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <p className="note-name empty">
+              <b>{beat?.rest ? 'Rest' : 'Empty'}</b>
+              <span className="mono">string {cursor.string}</span>
             </p>
-            <div className="lock-row">
-              {note.fingeringLocked ? <Lock size={16} /> : <LockOpen size={16} />}
-              <span>{note.fingeringLocked ? 'Fingering locked' : 'Fingering unlocked'}</span>
-              <button type="button" className="link" onClick={() => dispatch({ type: 'toggleFingeringLock' })}>
-                {note.fingeringLocked ? 'Unlock' : 'Lock'}
-              </button>
+          )}
+        </section>
+      ) : (
+        <section>
+          <h3>{track.instrument === 'piano' ? 'Selected chord' : 'Selected beat'}</h3>
+          {track.instrument === 'piano' ? (
+            beat?.keys?.length ? (
+              <p className="note-name">
+                <b>{beat.keys.map(k => pitchName(k.pitch)).join(' ')}</b>
+                <span className="mono">{beat.keys.length === 1 ? '1 key' : `${beat.keys.length} keys`}</span>
+              </p>
+            ) : (
+              <p className="note-name empty">
+                <b>{beat?.rest ? 'Rest' : 'Empty'}</b>
+                <span className="mono">press A–G or a key below</span>
+              </p>
+            )
+          ) : beat?.hits?.length ? (
+            <div className="chips">
+              {beat.hits.map(h => (
+                <span key={h.id} className="chip">
+                  {DRUM_PIECES[h.piece].label}
+                </span>
+              ))}
             </div>
-            {elsewhere.length > 0 && (
-              <>
-                <p className="muted small">Same pitch elsewhere</p>
-                <div className="chips">
-                  {elsewhere.map(x => (
-                    <button key={x.string} type="button" className="chip mono" onClick={() => dispatch({ type: 'placeFret', string: x.string, fret: x.fret })}>
-                      str {x.string} · fret {x.fret}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </>
-        ) : (
-          <p className="note-name empty">
-            <b>{beat?.rest ? 'Rest' : 'Empty'}</b>
-            <span className="mono">string {cursor.string}</span>
-          </p>
-        )}
-      </section>
+          ) : (
+            <p className="note-name empty">
+              <b>{beat?.rest ? 'Rest' : 'Empty'}</b>
+              <span className="mono">press 1–9, 0 or a pad</span>
+            </p>
+          )}
+        </section>
+      )}
 
       <section>
         <h3>Duration</h3>
@@ -104,12 +137,13 @@ export function NotePanel({ editor, dispatch }: Props) {
           <button type="button" className="chip" aria-pressed={!!beat?.rest} onClick={() => dispatch({ type: 'rest' })}>
             Rest
           </button>
-          <button type="button" className="chip" aria-pressed={!!note?.tieFromPrev} disabled={!note} onClick={() => dispatch({ type: 'tie' })}>
+          <button type="button" className="chip" aria-pressed={!!note?.tieFromPrev || !!beat?.keys?.some(k => k.tieFromPrev)} disabled={track.instrument === 'drums' || (fretted && !note) || (!fretted && !beat?.keys?.length)} onClick={() => dispatch({ type: 'tie' })}>
             Tie
           </button>
         </div>
       </section>
 
+      {fretted && (
       <section>
         <h3>Technique</h3>
         <div className="tech-grid">
@@ -155,6 +189,7 @@ export function NotePanel({ editor, dispatch }: Props) {
           </div>
         )}
       </section>
+      )}
     </aside>
   );
 }

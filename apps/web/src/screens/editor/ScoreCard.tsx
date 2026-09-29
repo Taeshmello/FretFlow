@@ -42,7 +42,7 @@ export function ScoreCard(p: Props) {
             <button type="button" className="head-btn">
               <b>{({ guitar: 'Gtr', bass: 'Bass', piano: 'Piano', drums: 'Drums' })[track.instrument]} {trackIndex + 1}</b>
               <span className="muted">
-                {stringInstrument ? `${tuning.replace('Standard', 'E standard')} · capo ${track.capo}` : `${track.instrument === 'drums' ? '타악기 보표' : '오선보'} 표시 · 전용 입력 준비 중`}
+                {stringInstrument ? `${tuning.replace('Standard', 'E standard')} · capo ${track.capo}` : track.instrument === 'drums' ? 'Percussion staff' : 'Grand staff'}
               </span>
             </button>
           )}
@@ -68,7 +68,7 @@ export function ScoreCard(p: Props) {
             TAB
           </button>
           <button type="button" role="radio" aria-checked={p.viewMode === 'score'} onClick={() => p.onViewMode('score')}>
-            오선보
+            Staff
           </button>
         </div>}
         {stringInstrument && <button
@@ -83,27 +83,27 @@ export function ScoreCard(p: Props) {
       </header>
       {p.editable && beat && (
         <div className="chord-strip">
-          <label htmlFor="score-chord-symbol">코드명</label>
+          <label htmlFor="score-chord-symbol">Chord</label>
           <input
             id="score-chord-symbol"
             type="text"
             maxLength={32}
             value={beat.chord ?? ''}
-            placeholder="예: Am7, G/B"
-            aria-label="선택한 박의 코드명"
+            placeholder="e.g. Am7, G/B"
+            aria-label="Chord symbol of the selected beat"
             onChange={e => dispatch({ type: 'setChord', beatId: beat.id, chord: e.target.value })}
           />
-          <label htmlFor="score-lyric">가사</label>
+          <label htmlFor="score-lyric">Lyric</label>
           <input
             id="score-lyric"
             type="text"
             maxLength={160}
             value={beat.lyric ?? ''}
-            placeholder="선택한 박의 가사"
-            aria-label="선택한 박의 가사"
+            placeholder="Lyric for the selected beat"
+            aria-label="Lyric of the selected beat"
             onChange={e => dispatch({ type: 'setLyric', beatId: beat.id, lyric: e.target.value })}
           />
-          <span className="muted small mono">{editor.cursor.barIndex + 1}마디 · {editor.cursor.beatIndex + 1}박</span>
+          <span className="muted small mono">Bar {editor.cursor.barIndex + 1} · beat {editor.cursor.beatIndex + 1}</span>
         </div>
       )}
       <div className="score-scroll" ref={p.scrollRef}>

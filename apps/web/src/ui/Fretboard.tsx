@@ -31,9 +31,9 @@ export function Fretboard({ editor, dispatch }: Props) {
   return (
     <div className="fretboard card" role="group" aria-label="Fretboard">
       <div className="fb-guide-head">
-        <button type="button" className="chip" aria-pressed={guideOn} onClick={() => setGuideOn(on => !on)}>솔로 음 가이드 {guideOn ? '끄기' : '켜기'}</button>
-        <span className="muted small">규칙 기반 · 생성형 AI 아님</span>
-        {guideOn && <span className="muted small">{guide.message} ⌥/Alt+클릭으로 미리 듣기.</span>}
+        <button type="button" className="chip" aria-pressed={guideOn} onClick={() => setGuideOn(on => !on)}>Solo guide {guideOn ? 'off' : 'on'}</button>
+        <span className="muted small">Rule-based, not generative AI</span>
+        {guideOn && <span className="muted small">{guide.message} ⌥/Alt+click to listen.</span>}
       </div>
       <div className="fb-names">
         {track.tuning.map((open, i) => (

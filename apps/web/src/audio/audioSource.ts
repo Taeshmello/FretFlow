@@ -14,7 +14,7 @@ export async function pullFromCloud(p: Persist, scoreId: string) {
   }
   const blob = await remote.downloadAudio(map.audioId);
   const id = await sha256Hex(await blob.arrayBuffer());
-  const stored = { id, blob, name: '클라우드 음원', type: blob.type, size: blob.size, durationMs: 0, remoteId: map.audioId };
+  const stored = { id, blob, name: 'Cloud recording', type: blob.type, size: blob.size, durationMs: 0, remoteId: map.audioId };
   await p.media.putAudio(stored);
   await p.media.setPref(`audio:${scoreId}`, id);
   await p.media.putSyncMap({ scoreId, audioId: id, anchors: map.anchors, offsetMs: map.offsetMs, updatedAt: Date.now() });
@@ -24,7 +24,7 @@ export async function pullFromCloud(p: Persist, scoreId: string) {
 
 export function loadErrorMessage(err: unknown): string {
   if (err instanceof AudioLoadError) {
-    return { tooLarge: '100MB 이하 파일만 올릴 수 있습니다.', tooLong: '15분 이하 음원만 지원합니다.', decodeFailed: '이 파일을 재생할 수 없습니다.' }[err.code];
+    return { tooLarge: 'Files up to 100 MB only.', tooLong: 'Recordings up to 15 minutes only.', decodeFailed: 'This file can’t be played.' }[err.code];
   }
   return String(err);
 }

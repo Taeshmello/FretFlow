@@ -20,10 +20,10 @@ export function WaveformCard({ rec, score, showBeatMap, onSetTempo }: Props) {
           <Upload size={20} />
         </span>
         <span>
-          <b>음원을 추가해 함께 연습하세요</b>
-          <span className="muted"> MP3, WAV, M4A · 최대 15분. 음원은 이 기기에만 저장되며 악보에 포함되지 않습니다.</span>
+          <b>Add a recording to practise along</b>
+          <span className="muted"> MP3, WAV or M4A up to 15 minutes. Only you can hear it — shared scores never include your audio.</span>
         </span>
-        <span className="btn">파일 선택</span>
+        <span className="btn">Choose file</span>
         <input type="file" accept="audio/*" hidden onChange={e => e.target.files?.[0] && void rec.open(e.target.files[0])} />
         {rec.error && <span className="error-text">{rec.error}</span>}
       </label>
@@ -31,7 +31,7 @@ export function WaveformCard({ rec, score, showBeatMap, onSetTempo }: Props) {
   }
   return (
     <div className="wave-card card">
-      <input type="file" accept="audio/*" hidden aria-label="음원 교체" onChange={e => e.target.files?.[0] && void rec.open(e.target.files[0])} />
+      <input type="file" accept="audio/*" hidden aria-label="Replace recording" onChange={e => e.target.files?.[0] && void rec.open(e.target.files[0])} />
       <Waveform
         peaks={rec.peaks}
         duration={rec.duration}

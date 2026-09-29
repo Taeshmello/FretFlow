@@ -48,7 +48,7 @@ export function Account({ onSignedIn }: { onSignedIn: () => void }) {
   }, []);
 
   if (!API_URL) {
-    return <span className="muted small">로컬 모드 · 이 브라우저에만 저장</span>;
+    return <span className="muted small">Local mode · saved in this browser only</span>;
   }
   if (me) {
     return (
@@ -62,7 +62,7 @@ export function Account({ onSignedIn }: { onSignedIn: () => void }) {
             setMe(null);
           }}
         >
-          로그아웃
+          Sign out
         </button>
       </span>
     );
@@ -71,10 +71,10 @@ export function Account({ onSignedIn }: { onSignedIn: () => void }) {
     <span className="account">
       {!open ? (
         <button type="button" className="ghost" onClick={() => setOpen(true)}>
-          로그인해서 클라우드에 저장
+          Sign in to save to the cloud
         </button>
       ) : sent ? (
-        <span className="muted">{email}로 로그인 링크를 보냈습니다.</span>
+        <span className="muted">We sent a sign-in link to {email}.</span>
       ) : (
         <form
           className="login"
@@ -88,13 +88,13 @@ export function Account({ onSignedIn }: { onSignedIn: () => void }) {
             if (r?.ok) {
               setSent(true);
             } else {
-              setError('링크를 보내지 못했습니다. 잠시 뒤 다시 시도하세요.');
+              setError('Could not send the link. Please try again in a moment.');
             }
           }}
         >
           <input type="email" required placeholder="email@example.com" value={email} onChange={e => setEmail(e.target.value)} />
           <button type="submit" className="primary small">
-            링크 받기
+            Email me a link
           </button>
           <button
             type="button"
@@ -109,7 +109,7 @@ export function Account({ onSignedIn }: { onSignedIn: () => void }) {
               if (body?.url) {
                 window.location.assign(body.url);
               } else {
-                setError('Google 로그인을 시작하지 못했습니다.');
+                setError('Could not start Google sign-in.');
               }
             }}
           >

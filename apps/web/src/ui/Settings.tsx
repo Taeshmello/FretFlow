@@ -127,7 +127,7 @@ export function TrackSettings({ editor, dispatch, muted, onToggleMute }: Props &
         <input type="number" min={0} max={12} value={track.capo} onChange={e => dispatch({ type: 'setCapo', capo: Number(e.target.value) })} />
       </label>
       <p className="muted small">Changing tuning or capo keeps the frets and moves the pitches.</p></>}
-      {!stringInstrument && <p className="muted small">오선보 표시만 지원합니다. 전용 음표 입력은 후속 단계입니다.</p>}
+      {!stringInstrument && <p className="muted small">{track.instrument === 'piano' ? 'Piano uses a grand staff; enter notes with A–G or the keyboard.' : 'Drums use a percussion staff; enter hits with 1–0 or the pads.'}</p>}
       <div className="chips">
         {score.tracks.map((t, i) => (
           <button key={t.id} type="button" className="chip" aria-pressed={muted.has(i)} onClick={() => onToggleMute(i)}>

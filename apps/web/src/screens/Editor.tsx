@@ -1,4 +1,4 @@
-import { cursorBeat, cursorTrack, selectionRange, beatsInRange, type Command } from '@fretflow/editor-core';
+import { cursorBeat, cursorTrack, selectionRange, beatsInRange } from '@fretflow/editor-core';
 import type { Converted } from '@fretflow/render';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { exportAsGp, exportAsJson, exportAsMidi, printScore } from '../app/files';
@@ -12,6 +12,9 @@ import { WaveformCard } from '../audio/WaveformCard';
 import { ExportDialog, HelpDialog } from '../ui/Dialogs';
 import { Fretboard, KeyboardHints } from '../ui/Fretboard';
 import { NotePanel } from '../ui/NotePanel';
+import { PianoKeyboard } from '../ui/PianoKeyboard';
+import { DrumPad } from '../ui/DrumPad';
+import { previewDrum, previewPitch } from '../audio/preview';
 import { TempoSettings } from '../ui/Settings';
 import { ScoreCard } from './editor/ScoreCard';
 import { TopBar, type Mode } from './editor/TopBar';
@@ -33,6 +36,8 @@ export function Editor({ store, onBack, saveLabel, saveError }: Props) {
   const playback = usePlayback(api);
   const [viewMode, setViewMode] = useState<ViewMode>('scoreTab');
   const [mode, setMode] = useState<Mode>('write');
+  /** Octave the piano letter keys type into (4 = middle C). */
+  const [octave, setOctave] = useState(4);
   const [dialog, setDialog] = useState<'export' | 'help' | null>(null);
   const convertedRef = useRef<Converted | null>(null);
   const onConverted = useCallback((c: Converted) => {
@@ -92,13 +97,23 @@ export function Editor({ store, onBack, saveLabel, saveError }: Props) {
       if (dialog || isTextTarget(e.target) || document.querySelector('dialog[open]')) {
         return;
       }
-      const result = mapKey(e);
+      const { score, cursor } = store.state;
+      const track = cursorTrack(score, cursor);
+      const result = mapKey(e, { instrument: track.instrument, octave });
       if (!result) {
         return;
       }
       e.preventDefault();
       if ('command' in result) {
-        dispatch(result.command as Command);
+        const c = result.command;
+        // Hear a key or drum as it is added, like the guitar audition.
+        const beat = cursorBeat(score, cursor);
+        if (c.type === 'togglePitch' && !beat?.keys?.some(k => k.pitch === c.pitch)) {
+          previewPitch(c.pitch);
+        } else if (c.type === 'toggleHit' && !beat?.hits?.some(h => h.piece === c.piece)) {
+          previewDrum(c.piece);
+        }
+        dispatch(c);
         return;
       }
       switch (result.shell) {
@@ -111,13 +126,19 @@ export function Editor({ store, onBack, saveLabel, saveError }: Props) {
         case 'escape':
           dispatch({ type: 'select', selection: null });
           break;
+        case 'octaveUp':
+          setOctave(o => Math.min(7, o + 1));
+          break;
+        case 'octaveDown':
+          setOctave(o => Math.max(1, o - 1));
+          break;
         case 'save':
           break;
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [dispatch, dialog, playPause]);
+  }, [dispatch, dialog, playPause, octave, store]);
 
   const sel = editor.selection ? selectionRange(editor.selection) : null;
   const selectedBars: [number, number] | null = sel ? [sel.from.barIndex + 1, sel.to.barIndex + 1] : null;
@@ -191,8 +212,8 @@ export function Editor({ store, onBack, saveLabel, saveError }: Props) {
         onExport={() => setDialog('export')}
         onBack={onBack}
       />
-      {saveError && <div className="banner error">저장에 실패했습니다. 브라우저 저장 공간을 확인하세요. 편집 내용은 다음 저장 때 다시 시도합니다.</div>}
-      {error && <div className="banner error">악보 표시 오류: {error}</div>}
+      {saveError && <div className="banner error">Saving failed. Check your browser storage; your edits will be retried on the next save.</div>}
+      {error && <div className="banner error">Score display error: {error}</div>}
       {editor.notice && <div className="banner">{editor.notice}</div>}
       <TransportBar
         playing={recording.loaded ? recording.playing : playback.state.playing}
@@ -244,8 +265,14 @@ export function Editor({ store, onBack, saveLabel, saveError }: Props) {
               <KeyboardHints onAll={() => setDialog('help')} />
             </div>
           )}
+          {mode === 'write' && activeTrack.instrument === 'piano' && (
+            <PianoKeyboard editor={editor} dispatch={dispatch} octave={octave} onOctave={setOctave} />
+          )}
+          {mode === 'write' && activeTrack.instrument === 'drums' && <DrumPad editor={editor} dispatch={dispatch} />}
         </main>
-        {mode === 'write' ? (stringInstrument ? <NotePanel editor={editor} dispatch={dispatch} /> : <aside className="card practice-rail"><h3>전용 입력 준비 중</h3><p>피아노·드럼은 현재 오선보 표시와 기본 악보 설정을 지원합니다. 음표 입력은 후속 단계에서 추가됩니다.</p></aside>) : (
+        {mode === 'write' ? (
+          <NotePanel editor={editor} dispatch={dispatch} />
+        ) : (
           <PracticePanel
             speed={recording.loaded ? recording.rate : playback.state.speed}
             onSpeed={setSpeed}
@@ -259,7 +286,7 @@ export function Editor({ store, onBack, saveLabel, saveError }: Props) {
           />
         )}
       </div>
-      {mode === 'write' && stringInstrument && <TouchInput editor={editor} dispatch={dispatch} />}
+      {mode === 'write' && <TouchInput editor={editor} dispatch={dispatch} octave={octave} onOctave={setOctave} />}
       {dialog === 'help' && <HelpDialog onClose={() => setDialog(null)} />}
       {dialog === 'export' && (
         <ExportDialog

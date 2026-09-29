@@ -22,7 +22,7 @@ interface Props {
 export function TopBar(p: Props) {
   return (
     <header className="topbar">
-      <button type="button" className="app-icon" aria-label="악보 목록" onClick={p.onBack}>
+      <button type="button" className="app-icon" aria-label="My scores" onClick={p.onBack}>
         <ArrowLeft size={20} />
       </button>
       <div className="title-block">
@@ -46,10 +46,10 @@ export function TopBar(p: Props) {
         <button type="button" className="icon-btn" aria-label="Redo" title="Redo (⌘⇧Z)" disabled={!p.canRedo} onClick={p.onRedo}>
           <Redo2 size={20} />
         </button>
-        <button type="button" className="btn export-trigger" onClick={p.onExport} aria-label="내보내기">
+        <button type="button" className="btn export-trigger" onClick={p.onExport} aria-label="Export">
           <Download size={17} /><span>Export</span>
         </button>
-        <button type="button" className="btn primary share-trigger" disabled title="공유 기능은 다음 버전에 제공됩니다">
+        <button type="button" className="btn primary share-trigger" disabled title="Sharing is coming in a later version">
           <Share2 size={18} /> Share
         </button>
       </div>

@@ -40,11 +40,11 @@ function context(cursor: Cursor, track: Track): { chord: string | null; anchor: 
 /** Deterministic chord/scale hints. This is deliberately not an AI model. */
 export function suggestNextNotes(score: Score, cursor: Cursor, maxFret = 15): SoloGuide {
   const track = score.tracks.find(t => t.id === cursor.trackId) ?? score.tracks[0];
-  if (!track || !track.tuning.length) return { chord: null, notes: [], message: '기타·베이스 트랙에서 사용할 수 있습니다.' };
+  if (!track || !track.tuning.length) return { chord: null, notes: [], message: 'Available on guitar and bass tracks.' };
   const { chord, anchor } = context(cursor, track);
-  if (!chord) return { chord: null, notes: [], message: '선택한 박의 코드명을 입력하면 후보 음을 보여줍니다.' };
+  if (!chord) return { chord: null, notes: [], message: 'Enter a chord for the selected beat to see candidate notes.' };
   const shape = chordShape(chord);
-  if (!shape) return { chord, notes: [], message: `“${chord}” 코드는 아직 분석할 수 없습니다.` };
+  if (!shape) return { chord, notes: [], message: `“${chord}” can’t be analysed yet.` };
   const candidates: (GuideNote & { rank: number })[] = [];
   for (let string = 1; string <= track.tuning.length; string++) {
     for (let fret = 0; fret <= Math.min(maxFret, track.maxFret); fret++) {
@@ -54,7 +54,7 @@ export function suggestNextNotes(score: Score, cursor: Cursor, maxFret = 15): So
       const distance = anchor ? Math.abs(pitch - anchor.pitch) : Math.abs(fret - 5);
       const fretDistance = anchor ? Math.abs(fret - anchor.fret) : Math.abs(fret - 5);
       const rank = distance * 2 + fretDistance + (anchor ? Math.abs(string - anchor.string) : 0) + (fret === 0 ? 1 : 0);
-      const reason = kind === 'chord' ? '코드톤 · 안정적' : kind === 'passing' ? '스케일 음 · 연결' : '긴장음 · 실험적';
+      const reason = kind === 'chord' ? 'Chord tone · stable' : kind === 'passing' ? 'Scale tone · connecting' : 'Tension · adventurous';
       candidates.push({ string, fret, pitch, kind, reason, rank });
     }
   }
@@ -62,5 +62,5 @@ export function suggestNextNotes(score: Score, cursor: Cursor, maxFret = 15): So
   for (const [kind, count] of [['chord', 4], ['passing', 2], ['tension', 2]] as const) {
     selected.push(...candidates.filter(c => c.kind === kind).sort((a, b) => a.rank - b.rank || a.string - b.string || a.fret - b.fret).slice(0, count).map(({ rank: _rank, ...note }) => note));
   }
-  return { chord, notes: selected, message: `${chord} 기준 · 파랑은 코드톤, 금색은 연결음, 빨강은 긴장음입니다. 틀린 음을 뜻하지 않습니다.` };
+  return { chord, notes: selected, message: `Over ${chord}: blue = chord tones, gold = passing tones, red = tensions (not wrong notes).` };
 }

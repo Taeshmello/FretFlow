@@ -732,3 +732,149 @@
     --guide-color: #dc5e54;
   }
 }
+
+/* ---------- piano keyboard & drum pads (D-023) ---------- */
+.piano,
+.drum-pad {
+  padding: 10px 14px 14px;
+  margin-top: 12px;
+}
+
+.piano-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.piano-head .spacer {
+  flex: 1;
+}
+
+.piano-keys {
+  display: flex;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.piano-octave {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.piano-octave.is-entry .pk.white {
+  background: linear-gradient(#fff, #f3f5fc);
+}
+
+.pk {
+  padding: 0;
+  border-radius: 0 0 6px 6px;
+  cursor: pointer;
+}
+
+.pk.white {
+  width: 38px;
+  height: 118px;
+  background: #fff;
+  border: 1px solid #c9c7bf;
+  margin-right: -1px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  font-family: 'JetBrains Mono Variable', ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--muted);
+  padding-bottom: 6px;
+}
+
+.pk.black {
+  position: absolute;
+  top: 0;
+  width: 24px;
+  height: 72px;
+  background: #242521;
+  border: 1px solid #111;
+  z-index: 1;
+}
+
+/* Black keys straddle white keys: 38px wide with a -1px overlap = 37px pitch, black 24px. */
+.pk.black.b1 { left: 25px; }
+.pk.black.b3 { left: 62px; }
+.pk.black.b6 { left: 136px; }
+.pk.black.b8 { left: 173px; }
+.pk.black.b10 { left: 210px; }
+
+.pk.white[aria-pressed='true'] {
+  background: var(--accent-soft);
+  box-shadow: inset 0 -6px 0 var(--accent);
+  color: var(--accent);
+}
+
+.pk.black[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.pads {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pad {
+  min-height: 58px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.pad kbd {
+  font-size: 10px;
+}
+
+.pad[aria-pressed='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+@media (max-width: 900px) {
+  .touch-input .piano,
+  .touch-input .drum-pad {
+    margin-top: 0;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+
+  .touch-input .piano-head .muted,
+  .touch-input .drum-pad .piano-head .muted {
+    display: none;
+  }
+
+  .touch-input .pk.white {
+    width: 34px;
+    height: 96px;
+  }
+
+  .touch-input .pk.black {
+    width: 22px;
+    height: 58px;
+  }
+
+  .touch-input .pk.black.b1 { left: 22px; }
+  .touch-input .pk.black.b3 { left: 55px; }
+  .touch-input .pk.black.b6 { left: 121px; }
+  .touch-input .pk.black.b8 { left: 154px; }
+  .touch-input .pk.black.b10 { left: 187px; }
+
+  .touch-input .pads {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

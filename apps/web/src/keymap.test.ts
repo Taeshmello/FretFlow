@@ -51,3 +51,39 @@ describe('mapKey (SPEC §5.2)', () => {
     expect(mapKey(k('r', { metaKey: true }))).toBeNull();
   });
 });
+
+describe('mapKey on piano and drum tracks (D-023)', () => {
+  const piano = { instrument: 'piano' as const, octave: 4 };
+  const drums = { instrument: 'drums' as const, octave: 4 };
+
+  it('turns letters into piano keys in the current octave, Shift for sharps', () => {
+    expect(mapKey(k('c'), piano)).toEqual({ command: { type: 'togglePitch', pitch: 60 } });
+    expect(mapKey(k('A'), piano)).toEqual({ command: { type: 'togglePitch', pitch: 69 } });
+    expect(mapKey(k('F', { shiftKey: true }), piano)).toEqual({ command: { type: 'togglePitch', pitch: 66 } });
+    expect(mapKey(k('c'), { ...piano, octave: 2 })).toEqual({ command: { type: 'togglePitch', pitch: 36 } });
+  });
+
+  it('changes octave with Z and X and transposes with the up and down arrows', () => {
+    expect(mapKey(k('z'), piano)).toEqual({ shell: 'octaveDown' });
+    expect(mapKey(k('x'), piano)).toEqual({ shell: 'octaveUp' });
+    expect(mapKey(k('ArrowUp'), piano)).toEqual({ command: { type: 'transposeKeys', delta: 1 } });
+    expect(mapKey(k('ArrowDown', { shiftKey: true }), piano)).toEqual({ command: { type: 'transposeKeys', delta: -12 } });
+  });
+
+  it('keeps rhythm, rest, tie and navigation keys on piano, and drops fret digits', () => {
+    expect(mapKey(k('r'), piano)).toEqual({ command: { type: 'rest' } });
+    expect(mapKey(k('t'), piano)).toEqual({ command: { type: 'tie' } });
+    expect(mapKey(k('+'), piano)).toEqual({ command: { type: 'shorter' } });
+    expect(mapKey(k('ArrowRight'), piano)).toEqual({ command: { type: 'moveBeat', delta: 1, extend: false } });
+    expect(mapKey(k('5'), piano)).toBeNull();
+  });
+
+  it('maps number keys to drum kit pieces', () => {
+    expect(mapKey(k('1'), drums)).toEqual({ command: { type: 'toggleHit', piece: 'kick' } });
+    expect(mapKey(k('2'), drums)).toEqual({ command: { type: 'toggleHit', piece: 'snare' } });
+    expect(mapKey(k('3'), drums)).toEqual({ command: { type: 'toggleHit', piece: 'hihatClosed' } });
+    expect(mapKey(k('0'), drums)).toEqual({ command: { type: 'toggleHit', piece: 'sideStick' } });
+    expect(mapKey(k('ArrowUp'), drums)).toBeNull();
+    expect(mapKey(k('b'), drums)).toBeNull();
+  });
+});

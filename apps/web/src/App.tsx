@@ -12,10 +12,10 @@ import { ConflictDialog, ImportReport, Tutorial } from './ui/Dialogs';
 
 const SAVE_LABEL: Record<SaveStatus, string> = {
   idle: '',
-  pending: '편집 중…',
-  saving: '저장 중…',
-  saved: '저장됨',
-  error: '저장 실패',
+  pending: 'Editing…',
+  saving: 'Saving…',
+  saved: 'Saved',
+  error: 'Save failed',
 };
 
 export function App() {
@@ -66,7 +66,7 @@ export function App() {
           }
         }
       })
-      .catch(err => setFatal(`브라우저 저장소를 열 수 없습니다: ${err instanceof Error ? err.message : String(err)}`));
+      .catch(err => setFatal(`Could not open browser storage: ${err instanceof Error ? err.message : String(err)}`));
     // openStore is stable enough for the first load.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
