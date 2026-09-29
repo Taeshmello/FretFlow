@@ -738,6 +738,10 @@
 .drum-pad {
   padding: 10px 14px 14px;
   margin-top: 12px;
+  /* Keep the card inside its column; the keys scroll instead of stretching it. */
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .piano-head {
@@ -877,4 +881,23 @@
   .touch-input .pads {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+}
+
+.chord-detect {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.chord-detect b {
+  font-size: 16px;
+}
+
+.editor-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
 }

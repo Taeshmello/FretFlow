@@ -1,14 +1,16 @@
 import type { Score } from '@fretflow/score-model';
 import type { SaveStatus, ScoreSummary, SyncConflict } from '@fretflow/storage';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Account } from './app/Account';
-import { openFile } from './app/files';
 import { persistence, type Persistence } from './app/persistence';
 import { EditorStore } from './app/store';
 import { checkMilestones, track } from './app/telemetry';
-import { Editor } from './screens/Editor';
 import { Library } from './screens/Library';
 import { ConflictDialog, ImportReport, Tutorial } from './ui/Dialogs';
+
+// alphaTab (renderer, synth, importers) is several MB: load it only when a score opens,
+// so the score list appears right away.
+const Editor = lazy(() => import('./screens/Editor').then(m => ({ default: m.Editor })));
 
 const SAVE_LABEL: Record<SaveStatus, string> = {
   idle: '',
@@ -134,6 +136,7 @@ export function App() {
     }
     setImportError(null);
     try {
+      const { openFile } = await import('./app/files');
       const opened = await openFile(file);
       await p.scores.save(opened.score, null);
       track('score_imported', { source: opened.source, unsupported: opened.unsupported.size });
@@ -164,7 +167,9 @@ export function App() {
   return (
     <>
       {store ? (
-        <Editor key={store.state.score.id} store={store} onBack={back} saveLabel={SAVE_LABEL[saveStatus]} saveError={saveStatus === 'error'} />
+        <Suspense fallback={<div className="editor-loading">Loading the editor…</div>}>
+          <Editor key={store.state.score.id} store={store} onBack={back} saveLabel={SAVE_LABEL[saveStatus]} saveError={saveStatus === 'error'} />
+        </Suspense>
       ) : (
         <Library
           scores={scores}

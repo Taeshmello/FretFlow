@@ -1,6 +1,7 @@
 import { cursorBeat, cursorNote, cursorTrack, type Command, type EditorState } from '@fretflow/editor-core';
 import { DRUM_PIECES, fretFor, isFretted, pitchName, type BendAmount, type BendType, type DurationBase, type NoteEffects } from '@fretflow/score-model';
 import { Lock, LockOpen } from 'lucide-react';
+import { nameChord } from './chordName';
 
 interface Props {
   editor: EditorState;
@@ -37,6 +38,20 @@ export function NotePanel({ editor, dispatch }: Props) {
   const fx: NoteEffects = note?.effects ?? {};
   const d = beat?.duration;
   const fretted = isFretted(track.instrument);
+  const sounding = fretted ? (beat?.notes ?? []).map(n => n.pitch) : (beat?.keys ?? []).map(k => k.pitch);
+  const detected = nameChord(sounding);
+  const chordRow = detected && beat && (
+    <div className="chord-detect">
+      <span>
+        Chord <b>{detected}</b>
+      </span>
+      {beat.chord !== detected && (
+        <button type="button" className="link" onClick={() => dispatch({ type: 'setChord', beatId: beat.id, chord: detected })}>
+          Use as chord symbol
+        </button>
+      )}
+    </div>
+  );
   const elsewhere = note
     ? track.tuning
         .map((_, i) => i + 1)
@@ -78,6 +93,7 @@ export function NotePanel({ editor, dispatch }: Props) {
                   </div>
                 </>
               )}
+              {chordRow}
             </>
           ) : (
             <p className="note-name empty">
@@ -91,10 +107,13 @@ export function NotePanel({ editor, dispatch }: Props) {
           <h3>{track.instrument === 'piano' ? 'Selected chord' : 'Selected beat'}</h3>
           {track.instrument === 'piano' ? (
             beat?.keys?.length ? (
-              <p className="note-name">
-                <b>{beat.keys.map(k => pitchName(k.pitch)).join(' ')}</b>
-                <span className="mono">{beat.keys.length === 1 ? '1 key' : `${beat.keys.length} keys`}</span>
-              </p>
+              <>
+                <p className="note-name">
+                  <b>{beat.keys.map(k => pitchName(k.pitch)).join(' ')}</b>
+                  <span className="mono">{beat.keys.length === 1 ? '1 key' : `${beat.keys.length} keys`}</span>
+                </p>
+                {chordRow}
+              </>
             ) : (
               <p className="note-name empty">
                 <b>{beat?.rest ? 'Rest' : 'Empty'}</b>
@@ -102,13 +121,24 @@ export function NotePanel({ editor, dispatch }: Props) {
               </p>
             )
           ) : beat?.hits?.length ? (
-            <div className="chips">
-              {beat.hits.map(h => (
-                <span key={h.id} className="chip">
-                  {DRUM_PIECES[h.piece].label}
-                </span>
-              ))}
-            </div>
+            <>
+              <div className="chips">
+                {beat.hits.map(h => (
+                  <button
+                    key={h.id}
+                    type="button"
+                    className="chip"
+                    aria-pressed={h.dynamic !== undefined}
+                    title="Click for accent, again for ghost note, again for normal"
+                    onClick={() => dispatch({ type: 'cycleHitDynamic', piece: h.piece })}
+                  >
+                    {h.dynamic === 'ghost' ? `(${DRUM_PIECES[h.piece].label})` : DRUM_PIECES[h.piece].label}
+                    {h.dynamic === 'accent' ? ' >' : ''}
+                  </button>
+                ))}
+              </div>
+              <p className="muted small">Click a piece for accent → ghost → normal.</p>
+            </>
           ) : (
             <p className="note-name empty">
               <b>{beat?.rest ? 'Rest' : 'Empty'}</b>

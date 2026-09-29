@@ -1,6 +1,7 @@
 import type { Score } from '@fretflow/score-model';
 import type { ScoreSummary } from '@fretflow/storage';
 import { useState } from 'react';
+import { LicensesDialog } from '../ui/Dialogs';
 import { NewScoreDialog } from './NewScoreDialog';
 
 interface Props {
@@ -18,6 +19,7 @@ export function Library(p: Props) {
   const [creating, setCreating] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [showLicenses, setShowLicenses] = useState(false);
 
   return (
     <div
@@ -111,8 +113,12 @@ export function Library(p: Props) {
         </ul>
       )}
       <footer className="lib-foot muted small">
-        Scores save automatically in this browser. Your recordings are never included in score files or shares. Rendering by alphaTab (MPL-2.0) · Bravura (OFL) · Sonivox (Apache-2.0).
+        Scores save automatically in this browser. Your recordings are never included in score files or shares.{' '}
+        <button type="button" className="link" onClick={() => setShowLicenses(true)}>
+          Open-source licenses
+        </button>
       </footer>
+      {showLicenses && <LicensesDialog onClose={() => setShowLicenses(false)} />}
     </div>
   );
 }
