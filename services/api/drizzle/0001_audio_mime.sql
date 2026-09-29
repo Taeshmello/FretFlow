@@ -1,0 +1,1 @@
+ALTER TABLE "audio_assets" ADD COLUMN "mime" text DEFAULT 'application/octet-stream' NOT NULL;
