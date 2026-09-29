@@ -114,6 +114,33 @@ export class RemoteScoreStore implements ScoreStore {
     }
   }
 
+  /** Beat maps stored on the server for a score (for opening it on another device). */
+  async syncMaps(scoreId: Id): Promise<{ audioId: string; anchors: { tick: number; seconds: number }[]; offsetMs: number }[]> {
+    const res = await this.request(`/api/scores/${encodeURIComponent(scoreId)}/sync-maps`);
+    if (res.status === 404) {
+      return [];
+    }
+    if (!res.ok) {
+      throw new StorageError(`sync maps failed (${res.status})`);
+    }
+    const body = (await res.json()) as { syncMaps: { audio_id: string; anchors: { tick: number; seconds: number }[]; offset_ms: number }[] };
+    return body.syncMaps.map(m => ({ audioId: m.audio_id, anchors: m.anchors, offsetMs: m.offset_ms }));
+  }
+
+  /** Fetches an uploaded audio file through a short-lived signed URL. Storage never gets our cookies. */
+  async downloadAudio(audioId: string): Promise<Blob> {
+    const res = await this.request(`/api/audio/${encodeURIComponent(audioId)}/url`);
+    if (!res.ok) {
+      throw new StorageError(`audio url failed (${res.status})`);
+    }
+    const { url } = (await res.json()) as { url: string };
+    const file = await this.fetchImpl(url, { credentials: 'omit' });
+    if (!file.ok) {
+      throw new StorageError(`audio download failed (${file.status})`);
+    }
+    return file.blob();
+  }
+
   /**
    * Signed upload flow: ask for a URL (or get an existing id), PUT the bytes, mark complete.
    * The same MIME type goes into the signature request and the PUT, or S3 rejects the signature.

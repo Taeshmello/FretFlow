@@ -243,3 +243,27 @@ describe('RemoteScoreStore.uploadAudio', () => {
     expect(calls).toEqual(['http://api/api/audio/upload-url']);
   });
 });
+
+describe('RemoteScoreStore beat maps and audio download', () => {
+  it('lists the beat maps saved for a score', async () => {
+    const remote = new RemoteScoreStore('http://api', async url => {
+      expect(url).toBe('http://api/api/scores/s1/sync-maps');
+      return new Response(JSON.stringify({ syncMaps: [{ audio_id: 'a1', anchors: [{ tick: 0, seconds: 1 }], offset_ms: 20, updated_at: 'x' }] }));
+    });
+    expect(await remote.syncMaps('s1')).toEqual([{ audioId: 'a1', anchors: [{ tick: 0, seconds: 1 }], offsetMs: 20 }]);
+  });
+
+  it('downloads audio through the signed URL without sending cookies to storage', async () => {
+    const calls: { url: string; credentials?: RequestCredentials }[] = [];
+    const remote = new RemoteScoreStore('http://api', async (url, init) => {
+      calls.push({ url, credentials: init?.credentials });
+      if (url === 'http://api/api/audio/a1/url') {
+        return new Response(JSON.stringify({ url: 'https://s3/get?sig' }));
+      }
+      return new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'audio/wav' } });
+    });
+    const blob = await remote.downloadAudio('a1');
+    expect(blob.size).toBe(3);
+    expect(calls[1]).toEqual({ url: 'https://s3/get?sig', credentials: 'omit' });
+  });
+});
