@@ -23,6 +23,27 @@ export interface EditorState {
   revision: number;
   /** Short user-facing message from the last command (e.g. dropped notes on paste). */
   notice: string | null;
+  /** Last text/number field edited, so consecutive keystrokes become one undo step. */
+  lastField: { key: string; at: number } | null;
+}
+
+/** Keystrokes into the same field closer together than this are one transaction. */
+export const FIELD_MERGE_MS = 1500;
+
+/** Inspector/title fields that are typed character by character. */
+function fieldKey(command: Command, cursor: Cursor): string | null {
+  switch (command.type) {
+    case 'setMasterBar':
+      return `bar:${command.barIndex ?? cursor.barIndex}:${command.prop}`;
+    case 'setTitle':
+      return command.artist === undefined ? 'title' : 'artist';
+    case 'renameTrack':
+      return `track:${cursor.trackId}:name`;
+    case 'setCapo':
+      return `track:${cursor.trackId}:capo`;
+    default:
+      return null;
+  }
 }
 
 export function createEditor(score: Score, settings: Partial<Settings> = {}): EditorState {
@@ -36,6 +57,7 @@ export function createEditor(score: Score, settings: Partial<Settings> = {}): Ed
     settings: { ...DEFAULT_SETTINGS, ...settings },
     revision: 0,
     notice: null,
+    lastField: null,
   };
 }
 
@@ -87,7 +109,7 @@ export type Command =
   | { type: 'selectAll' }
   | { type: 'settings'; settings: Partial<Settings> };
 
-function commit(state: EditorState, change: Change | null, now: number): EditorState {
+function commitChange(state: EditorState, change: Change | null, now: number): EditorState {
   if (!change) {
     return state;
   }
@@ -111,7 +133,19 @@ function extendSelection(state: EditorState, to: Cursor, extend: boolean | undef
 
 /** Pure reducer: every UI action goes through here. `now` is injected so timing is testable. */
 export function execute(state: EditorState, command: Command, now: number): EditorState {
+  const key = fieldKey(command, state.cursor);
+  const sameField = key !== null && state.lastField?.key === key && now - state.lastField.at <= FIELD_MERGE_MS;
+  const next = run(state, command, now, sameField);
+  if (next === state) {
+    return state;
+  }
+  return { ...next, lastField: key ? { key, at: now } : null };
+}
+
+function run(state: EditorState, command: Command, now: number, mergeField: boolean): EditorState {
   const base: EditorState = { ...state, notice: null, pending: command.type === 'digit' ? state.pending : null };
+  const commit = (s: EditorState, change: Change | null, at: number) =>
+    commitChange(s, change && mergeField ? { ...change, merge: true } : change, at);
   const { score, cursor, selection } = base;
   const trackId = cursor.trackId;
 

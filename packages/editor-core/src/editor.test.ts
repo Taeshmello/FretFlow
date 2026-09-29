@@ -264,3 +264,35 @@ describe('undo / redo', () => {
     expect(s.history.redo).toHaveLength(0);
   });
 });
+
+describe('typing into inspector fields', () => {
+  it('undoes a whole typed word in one step', () => {
+    let s = fresh();
+    ['V', 'Ve', 'Ver', 'Vers', 'Verse'].forEach((v, i) => {
+      s = execute(s, { type: 'setMasterBar', prop: 'section', value: v }, 1000 + i * 200);
+    });
+    expect(s.score.masterBars[0].section).toBe('Verse');
+    expect(s.history.undo).toHaveLength(1);
+    s = execute(s, { type: 'undo' }, 3000);
+    expect(s.score.masterBars[0].section).toBeUndefined();
+  });
+
+  it('starts a new undo step after a pause or when another field is edited', () => {
+    let s = fresh();
+    s = execute(s, { type: 'setTitle', title: 'A' }, 0);
+    s = execute(s, { type: 'setTitle', title: 'AB' }, 300);
+    s = execute(s, { type: 'setTitle', title: 'ABC' }, 5000);
+    expect(s.history.undo).toHaveLength(2);
+    s = execute(s, { type: 'setMasterBar', prop: 'tempo', value: 90 }, 5100);
+    s = execute(s, { type: 'setMasterBar', prop: 'section', value: 'X' }, 5200);
+    expect(s.history.undo).toHaveLength(4);
+  });
+
+  it('never merges typing into a note edit made in between', () => {
+    let s = fresh();
+    s = execute(s, { type: 'setMasterBar', prop: 'tempo', value: 100 }, 0);
+    s = execute(s, { type: 'digit', digit: 3 }, 100);
+    s = execute(s, { type: 'setMasterBar', prop: 'tempo', value: 110 }, 200);
+    expect(s.history.undo).toHaveLength(3);
+  });
+});
