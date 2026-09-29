@@ -1,16 +1,18 @@
+import type { AutoRunResult } from '../bench/autoRun';
 import { percentile, type Sample } from '../bench/latency';
 
 interface StatsProps {
   samples: readonly Sample[];
   conditions: string;
   buildMs: number | null;
+  result: AutoRunResult | null;
 }
 
 function format(value: number): string {
   return Number.isNaN(value) ? '—' : `${value.toFixed(1)}ms`;
 }
 
-export function Stats({ samples, conditions, buildMs }: StatsProps) {
+export function Stats({ samples, conditions, buildMs, result }: StatsProps) {
   const totals = samples.map(s => s.total);
   const renders = samples.map(s => s.render);
 
@@ -40,6 +42,8 @@ export function Stats({ samples, conditions, buildMs }: StatsProps) {
       <p className="meta">표본 {samples.length} / 100</p>
       {buildMs !== null && <p className="meta">악보 생성 {buildMs.toFixed(1)}ms</p>}
       <p className="meta conditions">{conditions}</p>
+      {/* Selectable so the numbers can be copied off a device without Web Inspector. */}
+      {result && <pre className="result">{JSON.stringify(result, null, 2)}</pre>}
     </aside>
   );
 }

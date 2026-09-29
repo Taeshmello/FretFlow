@@ -134,6 +134,7 @@ body {
 .stats td.headline { font-size: 17px; font-weight: 600; }
 .stats .meta { margin: 6px 0 0; font-size: 11px; color: #b9bab4; }
 .stats .conditions { color: #8d8f88; }
+.stats .result { margin: 8px 0 0; font-size: 11px; color: #d8d9d3; white-space: pre-wrap; user-select: text; -webkit-user-select: text; }
 
 .dropzone { position: relative; }
 

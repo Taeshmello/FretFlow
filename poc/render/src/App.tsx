@@ -2,6 +2,7 @@ import * as alphaTab from '@coderline/alphatab';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { buildCursorView, cursorBox, cursorFromPoint, type CursorBox, type ViewNote } from './alphatab/bounds';
 import { useAlphaTab, type AlphaTabOptions } from './alphatab/useAlphaTab';
+import { advanceAutoRun, nextDigit, startAutoRun, summarize, type AutoRun, type AutoRunResult } from './bench/autoRun';
 import { pushSample, type Sample } from './bench/latency';
 import { moveBeat, moveString, noteAt, type Cursor, type CursorScore } from './cursor/cursor';
 import { buildScore } from './score/benchScore';
@@ -12,11 +13,15 @@ import { Stats } from './ui/Stats';
 import { Toolbar, type RenderMode, type ScoreSource } from './ui/Toolbar';
 
 const STALE_MEASUREMENT_MS = 5000;
+const AUTO_RUN_SAMPLES = 100;
+const AUTO_RUN_WARMUP = 5;
+/** Pause between automated edits, roughly a fast typist, so edits never pile up. */
+const AUTO_RUN_GAP_MS = 100;
 
 declare global {
   interface Window {
     /** PoC-only handle so measurements and coordinate probes can be driven from the console. */
-    __poc?: { api: alphaTab.AlphaTabApi; score: alphaTab.model.Score | null };
+    __poc?: { api: alphaTab.AlphaTabApi; score: alphaTab.model.Score | null; result?: AutoRunResult };
   }
 }
 
@@ -49,14 +54,42 @@ export function App() {
   const [box, setBox] = useState<CursorBox | null>(null);
   const [surfaceOffset, setSurfaceOffset] = useState({ left: 0, top: 0 });
   const [renderTick, setRenderTick] = useState(0);
+  const [autoRunning, setAutoRunning] = useState(false);
+  const [autoResult, setAutoResult] = useState<AutoRunResult | null>(null);
 
   const { containerRef, api, error } = useAlphaTab(options);
   const scoreRef = useRef<alphaTab.model.Score | null>(null);
   const viewRef = useRef<CursorScore<ViewNote> | null>(null);
   const cursorRef = useRef(cursor);
   const pendingRef = useRef<{ t0: number } | null>(null);
+  const autoRunRef = useRef<AutoRun | null>(null);
+  const autoTimerRef = useRef<number | null>(null);
+  const conditionsRef = useRef('');
+  const samplesRef = useRef<Sample[]>([]);
 
   cursorRef.current = cursor;
+  samplesRef.current = samples;
+
+  const stopAutoRun = useCallback(() => {
+    autoRunRef.current = null;
+    if (autoTimerRef.current !== null) {
+      window.clearTimeout(autoTimerRef.current);
+      autoTimerRef.current = null;
+    }
+    setAutoRunning(false);
+  }, []);
+
+  // Goes through the same keydown path a real key press would.
+  const dispatchAutoEdit = useCallback(() => {
+    autoTimerRef.current = null;
+    const view = viewRef.current;
+    const target = view ? noteAt(view, cursorRef.current) : null;
+    if (!target) {
+      stopAutoRun();
+      return;
+    }
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: nextDigit(target.note.fret) }));
+  }, [stopAutoRun]);
 
   const showScore = useCallback(
     (score: alphaTab.model.Score, builtIn: number | null) => {
@@ -67,12 +100,15 @@ export function App() {
       setBuildMs(builtIn);
       setSamples([]);
       pendingRef.current = null;
+      stopAutoRun();
+      // A result belongs to the conditions it was measured under.
+      setAutoResult(null);
       api?.renderScore(score, [0]);
       if (api) {
         window.__poc = { api, score };
       }
     },
-    [api],
+    [api, stopAutoRun],
   );
 
   useEffect(() => {
@@ -102,11 +138,50 @@ export function App() {
       pendingRef.current = null;
       const render = performance.now() - pending.t0;
       requestAnimationFrame(() => {
-        setSamples(prev => pushSample(prev, { total: performance.now() - pending.t0, render }));
+        const sample = { total: performance.now() - pending.t0, render };
+        const run = autoRunRef.current;
+        if (!run) {
+          setSamples(prev => pushSample(prev, sample));
+          return;
+        }
+        const next = advanceAutoRun(run);
+        autoRunRef.current = next.run;
+        const kept = next.keep ? pushSample(samplesRef.current, sample) : samplesRef.current;
+        samplesRef.current = kept;
+        setSamples(kept);
+        if (next.step === 'edit') {
+          autoTimerRef.current = window.setTimeout(dispatchAutoEdit, AUTO_RUN_GAP_MS);
+          return;
+        }
+        const result = summarize(kept, conditionsRef.current, navigator.userAgent);
+        setAutoResult(result);
+        if (window.__poc) {
+          window.__poc.result = result;
+        }
+        console.log('[poc] auto run result', JSON.stringify(result));
+        stopAutoRun();
       });
     });
-  }, [api]);
+  }, [api, dispatchAutoEdit, stopAutoRun]);
 
+  // A new api instance means new render conditions, so an in-flight run is void.
+  useEffect(() => stopAutoRun, [api, stopAutoRun]);
+
+  function handleAutoRun() {
+    if (autoRunning) {
+      stopAutoRun();
+      return;
+    }
+    const { run, step } = startAutoRun({ samples: AUTO_RUN_SAMPLES, warmup: AUTO_RUN_WARMUP });
+    autoRunRef.current = run;
+    samplesRef.current = [];
+    setSamples([]);
+    setAutoResult(null);
+    setAutoRunning(true);
+    if (step === 'edit') {
+      dispatchAutoEdit();
+    }
+  }
 
   // The cursor box has to be recomputed whenever the score is laid out again,
   // because every bounds object is rebuilt by that pass.
@@ -213,6 +288,7 @@ export function App() {
     options.enableLazyLoading ? 'lazy on' : 'lazy off',
     options.useWorkers ? 'worker on' : 'worker off',
   ].join(' · ');
+  conditionsRef.current = conditions;
 
   return (
     <div className="app">
@@ -229,13 +305,15 @@ export function App() {
         options={options}
         onOptionsChange={setOptions}
         onReset={() => setSamples([])}
+        autoRunning={autoRunning}
+        onAutoRun={handleAutoRun}
       />
       {banner && <div className="banner">{banner}</div>}
       <FileDrop onFile={handleFile}>
         <div className="surface" ref={containerRef} onClick={handleSurfaceClick} />
         <CursorOverlay box={box} offset={surfaceOffset} />
       </FileDrop>
-      <Stats samples={samples} conditions={conditions} buildMs={buildMs} />
+      <Stats samples={samples} conditions={conditions} buildMs={buildMs} result={autoResult} />
     </div>
   );
 }

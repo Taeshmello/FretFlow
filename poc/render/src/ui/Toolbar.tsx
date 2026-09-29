@@ -24,10 +24,13 @@ interface ToolbarProps {
   options: AlphaTabOptions;
   onOptionsChange: (value: AlphaTabOptions) => void;
   onReset: () => void;
+  autoRunning: boolean;
+  onAutoRun: () => void;
 }
 
 export function Toolbar(props: ToolbarProps) {
-  const { source, onSourceChange, renderMode, onRenderModeChange, options, onOptionsChange, onReset } = props;
+  const { source, onSourceChange, renderMode, onRenderModeChange, options, onOptionsChange, onReset, autoRunning, onAutoRun } =
+    props;
 
   return (
     <div className="toolbar">
@@ -89,6 +92,9 @@ export function Toolbar(props: ToolbarProps) {
 
       <button type="button" className="reset" onClick={onReset}>
         측정 초기화
+      </button>
+      <button type="button" className="reset" data-active={autoRunning} onClick={onAutoRun}>
+        {autoRunning ? '자동 측정 중지' : '자동 측정 100회'}
       </button>
     </div>
   );
