@@ -1,12 +1,17 @@
 import * as alphaTab from '@coderline/alphatab';
 import {
   createBar,
+  DRUM_ORDER,
+  drumPieceForMidi,
+  PIANO_HIGH,
+  PIANO_LOW,
   DEFAULT_MAX_FRET,
   newId,
   pitchOf,
   type Bar,
   type Beat,
   type BendAmount,
+  type DrumPiece,
   type Duration,
   type MasterBar,
   type Note,
@@ -236,20 +241,119 @@ function convertMasterBars(score: alphaTab.model.Score, report: Report): MasterB
   });
 }
 
-/** GP3–7 (via alphaTab) → our model. Keeps the first two stringed tracks and reports the rest. */
+type Kind = 'fretted' | 'piano' | 'drums';
+
+function kindOf(t: alphaTab.model.Track): Kind {
+  const staff = t.staves[0];
+  if (staff?.isPercussion) {
+    return 'drums';
+  }
+  return staff?.isStringed ? 'fretted' : 'piano';
+}
+
+/** Beats of one bar with just the duration and text fields (no notes yet). */
+function bareBeat(b: alphaTab.model.Beat, report: Report): Beat {
+  const out: Beat = { id: newId(), duration: convertDuration(b, report), rest: true, notes: [] };
+  if (b.lyrics?.[0]) {
+    out.lyric = b.lyrics[0];
+  }
+  if (b.chord?.name) {
+    out.chord = b.chord.name;
+  }
+  if (b.text) {
+    out.text = b.text;
+  }
+  return out;
+}
+
+const sameRhythm = (a: alphaTab.model.Beat[], b: alphaTab.model.Beat[]) =>
+  a.length === b.length && a.every((x, i) => x.duration === b[i].duration && x.dots === b[i].dots && x.tupletNumerator === b[i].tupletNumerator);
+
+const liveBeats = (bar: alphaTab.model.Bar | undefined) => (bar?.voices[0]?.beats ?? []).filter(b => !b.isEmpty);
+
+/** Piano: keys from every staff of a bar when their rhythm lines up; otherwise the top staff only. */
+function pianoBar(t: alphaTab.model.Track, i: number, mb: MasterBar, report: Report): Bar {
+  const top = liveBeats(t.staves[0]?.bars[i]);
+  if (!top.length) {
+    return createBar(mb);
+  }
+  const others = t.staves.slice(1).map(st => liveBeats(st.bars[i]));
+  const merged = others.filter(o => o.length && sameRhythm(top, o));
+  if (others.some(o => o.length && !sameRhythm(top, o))) {
+    report.add('piano staves with a different rhythm (top staff kept)');
+  }
+  const beats = top.map((b, bi) => {
+    const out = bareBeat(b, report);
+    const pitches = new Set<number>();
+    for (const n of [...b.notes, ...merged.flatMap(o => o[bi].notes)]) {
+      const pitch = n.realValue;
+      if (pitch < PIANO_LOW || pitch > PIANO_HIGH || pitches.has(pitch)) {
+        continue;
+      }
+      pitches.add(pitch);
+      out.keys ??= [];
+      out.keys.push({ id: newId(), pitch, source: 'import', ...(n.isTieDestination ? { tieFromPrev: true } : {}) });
+    }
+    out.keys?.sort((a, c) => a.pitch - c.pitch);
+    out.rest = !out.keys?.length;
+    return out;
+  });
+  return { id: newId(), masterBarId: mb.id, beats };
+}
+
+/** Drums: GM percussion numbers (or the track's own articulation list) → kit pieces. */
+function drumBar(t: alphaTab.model.Track, i: number, mb: MasterBar, report: Report): Bar {
+  const beats = liveBeats(t.staves[0]?.bars[i]).map(b => {
+    const out = bareBeat(b, report);
+    const seen = new Set<DrumPiece>();
+    for (const n of b.notes) {
+      const listed = t.percussionArticulations[n.percussionArticulation];
+      const midi = listed ? listed.outputMidiNumber : n.percussionArticulation;
+      const piece = drumPieceForMidi(midi);
+      if (!piece) {
+        report.add('drum sounds without a FretFlow kit piece');
+        continue;
+      }
+      if (!seen.has(piece)) {
+        seen.add(piece);
+        out.hits ??= [];
+        out.hits.push({ id: newId(), piece, source: 'import' });
+      }
+    }
+    out.hits?.sort((a, c) => DRUM_ORDER.indexOf(a.piece) - DRUM_ORDER.indexOf(c.piece));
+    out.rest = !out.hits?.length;
+    return out;
+  });
+  return beats.length ? { id: newId(), masterBarId: mb.id, beats } : createBar(mb);
+}
+
+/** GP3–7 (via alphaTab) → our model. Keeps the first two guitar, bass, piano or drum tracks. */
 export function fromAlphaTab(source: alphaTab.model.Score): ImportResult {
   const report = new Report();
   const masterBars = convertMasterBars(source, report);
-  const stringed = source.tracks.filter(t => t.staves[0] && t.staves[0].isStringed && !t.staves[0].isPercussion);
-  if (source.tracks.length > stringed.length) {
-    report.add('drum or non-string tracks', source.tracks.length - stringed.length);
-  }
-  if (stringed.length > MAX_IMPORT_TRACKS) {
-    report.add('tracks beyond the first two', stringed.length - MAX_IMPORT_TRACKS);
+  const usable = source.tracks.filter(t => t.staves[0]);
+  if (usable.length > MAX_IMPORT_TRACKS) {
+    report.add('tracks beyond the first two', usable.length - MAX_IMPORT_TRACKS);
   }
 
-  const tracks: Track[] = stringed.slice(0, MAX_IMPORT_TRACKS).map(t => {
+  const tracks: Track[] = usable.slice(0, MAX_IMPORT_TRACKS).map(t => {
+    const kind = kindOf(t);
     const staff = t.staves[0];
+    if (kind !== 'fretted') {
+      const instrument = kind === 'drums' ? 'drums' : 'piano';
+      if (t.staves.slice(1).some(st => st.bars.some(b => liveBeats(b).length)) && kind === 'drums') {
+        report.add('extra drum staves', t.staves.length - 1);
+      }
+      return {
+        id: newId(),
+        name: t.name || (instrument === 'drums' ? 'Drums' : 'Piano'),
+        instrument,
+        tuning: [],
+        capo: 0,
+        maxFret: 0,
+        bars: masterBars.map((mb, i) => (kind === 'drums' ? drumBar(t, i, mb, report) : pianoBar(t, i, mb, report))),
+      };
+    }
     const tuning = [...staff.tuning];
     const track: Track = {
       id: newId(),
@@ -278,7 +382,7 @@ export function fromAlphaTab(source: alphaTab.model.Score): ImportResult {
   });
 
   if (tracks.length === 0) {
-    throw new Error('The file has no guitar or bass track.');
+    throw new Error('The file has no track FretFlow can open.');
   }
 
   return {

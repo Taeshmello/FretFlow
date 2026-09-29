@@ -1,5 +1,5 @@
 import * as alphaTab from '@coderline/alphatab';
-import type { Beat, Id, MasterBar, Note, NoteEffects, Score, Track } from '@fretflow/score-model';
+import { DRUM_ORDER, DRUM_PIECES, isFretted, type Beat, type DrumPiece, type Id, type MasterBar, type Note, type NoteEffects, type Score, type Track } from '@fretflow/score-model';
 import { toAlphaTabString } from './strings';
 
 const at = alphaTab.model;
@@ -123,6 +123,68 @@ function convertMasterBar(mb: MasterBar): alphaTab.model.MasterBar {
   return m;
 }
 
+/** Piano keys from middle C up go on the treble staff, the rest on the bass staff. */
+export const GRAND_STAFF_SPLIT = 60;
+
+function keyNote(pitch: number, tied: boolean): alphaTab.model.Note {
+  const n = new at.Note();
+  n.octave = Math.floor(pitch / 12);
+  n.tone = pitch % 12;
+  n.isTieDestination = tied;
+  return n;
+}
+
+const F = at.MusicFontSymbol;
+/** Staff line and note heads per piece, as in alphaTab's GP7 default drum kit. */
+const DRUM_LOOK: Record<DrumPiece, [name: string, line: number, head: alphaTab.model.MusicFontSymbol, half: alphaTab.model.MusicFontSymbol, whole: alphaTab.model.MusicFontSymbol]> = {
+  kick: ['Kick Drum', 7, F.NoteheadBlack, F.NoteheadHalf, F.NoteheadWhole],
+  snare: ['Snare', 3, F.NoteheadBlack, F.NoteheadHalf, F.NoteheadWhole],
+  hihatClosed: ['Charley', -1, F.NoteheadXBlack, F.NoteheadXBlack, F.NoteheadXBlack],
+  hihatOpen: ['Charley', -1, F.NoteheadCircleX, F.NoteheadCircleX, F.NoteheadCircleX],
+  crash: ['Crash High', -2, F.NoteheadHeavyX, F.NoteheadHeavyX, F.NoteheadHeavyX],
+  ride: ['Ride', 0, F.NoteheadXBlack, F.NoteheadXBlack, F.NoteheadXBlack],
+  tomHigh: ['Tom High', 2, F.NoteheadBlack, F.NoteheadHalf, F.NoteheadWhole],
+  tomMid: ['Tom Medium', 4, F.NoteheadBlack, F.NoteheadHalf, F.NoteheadWhole],
+  tomFloor: ['Very Low Floor Tom', 5, F.NoteheadBlack, F.NoteheadHalf, F.NoteheadWhole],
+  sideStick: ['Snare', 3, F.NoteheadXBlack, F.NoteheadXBlack, F.NoteheadXBlack],
+  tomLow: ['Tom Low', 5, F.NoteheadBlack, F.NoteheadHalf, F.NoteheadWhole],
+  hihatPedal: ['Charley', 9, F.NoteheadXBlack, F.NoteheadXBlack, F.NoteheadXBlack],
+};
+
+/**
+ * The track's own articulation list, one entry per kit piece in DRUM_ORDER. A note's
+ * percussionArticulation is an index into this list: that is how Guitar Pro files
+ * store drums, so export, import, playback and rendering agree.
+ */
+function drumArticulations(): alphaTab.model.InstrumentArticulation[] {
+  return DRUM_ORDER.map(piece => {
+    const [name, line, head, half, whole] = DRUM_LOOK[piece];
+    const midi = DRUM_PIECES[piece].midi;
+    return new at.InstrumentArticulation(name, line, midi, head, half, whole, F.None, undefined, midi);
+  });
+}
+
+function drumNote(piece: DrumPiece): alphaTab.model.Note {
+  const n = new at.Note();
+  n.percussionArticulation = DRUM_ORDER.indexOf(piece);
+  return n;
+}
+
+function chordFor(staff: alphaTab.model.Staff, beat: Beat, converted: alphaTab.model.Beat, stringCount: number): void {
+  if (!beat.chord) {
+    return;
+  }
+  const chord = new at.Chord();
+  chord.name = beat.chord;
+  chord.showName = true;
+  chord.showDiagram = false;
+  chord.showFingering = false;
+  chord.strings = Array(stringCount).fill(-1);
+  const chordId = `beat-chord-${beat.id}`;
+  staff.addChord(chordId, chord);
+  converted.chordId = chordId;
+}
+
 function convertTrack(
   track: Track,
   trackIndex: number,
@@ -133,54 +195,74 @@ function convertTrack(
   const t = new at.Track();
   t.name = track.name;
   t.playbackInfo.program = PROGRAM[track.instrument];
-  t.playbackInfo.primaryChannel = trackIndex * 2;
-  t.playbackInfo.secondaryChannel = trackIndex * 2 + 1;
-  const staff = new at.Staff();
-  // Same order as ours: [0] is the highest string.
-  if (track.tuning.length) staff.stringTuning = new at.Tuning('', [...track.tuning], false);
-  staff.capo = track.capo;
-  const strings = track.instrument === 'guitar' || track.instrument === 'bass';
-  staff.showTablature = strings && options.staffMode !== 'score';
-  staff.showStandardNotation = !strings || options.staffMode !== 'tab';
-  staff.isPercussion = track.instrument === 'drums';
-  // Guitar and bass are written an octave above how they sound.
-  staff.displayTranspositionPitch = strings ? -12 : 0;
-  t.addStaff(staff);
+  // Drums play on the General MIDI percussion channel (10, index 9).
+  t.playbackInfo.primaryChannel = track.instrument === 'drums' ? 9 : trackIndex * 2;
+  t.playbackInfo.secondaryChannel = track.instrument === 'drums' ? 9 : trackIndex * 2 + 1;
+  const fretted = isFretted(track.instrument);
+  const grand = track.instrument === 'piano';
+  if (track.instrument === 'drums') {
+    t.percussionArticulations = drumArticulations();
+  }
+  const staffCount = grand ? 2 : 1;
+  const staves: alphaTab.model.Staff[] = [];
+  for (let i = 0; i < staffCount; i++) {
+    const staff = new at.Staff();
+    // Same order as ours: [0] is the highest string.
+    if (track.tuning.length) {
+      staff.stringTuning = new at.Tuning('', [...track.tuning], false);
+    }
+    staff.capo = track.capo;
+    staff.showTablature = fretted && options.staffMode !== 'score';
+    staff.showStandardNotation = !fretted || options.staffMode !== 'tab';
+    staff.isPercussion = track.instrument === 'drums';
+    // Guitar and bass are written an octave above how they sound.
+    staff.displayTranspositionPitch = fretted ? -12 : 0;
+    t.addStaff(staff);
+    staves.push(staff);
+  }
 
   const stringCount = track.tuning.length;
   track.bars.forEach((bar, barIndex) => {
-    const b = new at.Bar();
-    b.keySignature = (score.masterBars[barIndex]?.keySig ?? 0) as alphaTab.model.KeySignature;
-    if (track.instrument === 'bass') {
-      b.clef = at.Clef.F4;
-    } else if (track.instrument === 'drums') {
-      b.clef = at.Clef.Neutral;
-    }
-    const voice = new at.Voice();
-    b.addVoice(voice);
-    bar.beats.forEach((beat, beatIndex) => {
-      const converted = convertBeat(beat, stringCount);
-      if (beat.chord && stringCount) {
-        const chord = new at.Chord();
-        chord.name = beat.chord;
-        chord.showName = true;
-        chord.showDiagram = false;
-        chord.showFingering = false;
-        chord.strings = Array(stringCount).fill(-1);
-        const chordId = `beat-chord-${beat.id}`;
-        staff.addChord(chordId, chord);
-        converted.chordId = chordId;
+    staves.forEach((staff, staffIndex) => {
+      const b = new at.Bar();
+      b.keySignature = (score.masterBars[barIndex]?.keySig ?? 0) as alphaTab.model.KeySignature;
+      if (track.instrument === 'bass' || (grand && staffIndex === 1)) {
+        b.clef = at.Clef.F4;
+      } else if (track.instrument === 'drums') {
+        b.clef = at.Clef.Neutral;
       }
-      voice.addBeat(converted);
-      out.beats.set(beat.id, converted);
-      out.refs.set(converted, { trackIndex, barIndex, beatIndex, beatId: beat.id });
+      const voice = new at.Voice();
+      b.addVoice(voice);
+      bar.beats.forEach((beat, beatIndex) => {
+        const converted = convertBeat(beat, stringCount);
+        if (!beat.rest) {
+          for (const key of beat.keys ?? []) {
+            const upper = key.pitch >= GRAND_STAFF_SPLIT;
+            if (upper === (staffIndex === 0)) {
+              converted.addNote(keyNote(key.pitch, key.tieFromPrev === true));
+            }
+          }
+          for (const hit of beat.hits ?? []) {
+            converted.addNote(drumNote(hit.piece));
+          }
+        }
+        if (staffIndex > 0) {
+          // Lyrics and chord names belong to the top staff only.
+          converted.lyrics = null;
+        } else {
+          chordFor(staff, beat, converted, stringCount);
+          out.beats.set(beat.id, converted);
+        }
+        voice.addBeat(converted);
+        out.refs.set(converted, { trackIndex, barIndex, beatIndex, beatId: beat.id });
+      });
+      if (bar.beats.length === 0) {
+        const empty = new at.Beat();
+        empty.isEmpty = true;
+        voice.addBeat(empty);
+      }
+      staff.addBar(b);
     });
-    if (bar.beats.length === 0) {
-      const empty = new at.Beat();
-      empty.isEmpty = true;
-      voice.addBeat(empty);
-    }
-    staff.addBar(b);
   });
   return t;
 }
