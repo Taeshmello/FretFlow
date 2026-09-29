@@ -23,6 +23,8 @@ function buildIndex(score: Score): ScoreIndex {
       bar.beats.forEach((beat, bei) => {
         index.set(beat.id, { kind: 'beat', path: [ti, bi, bei] });
         beat.notes.forEach((note, ni) => index.set(note.id, { kind: 'note', path: [ti, bi, bei, ni] }));
+        beat.keys?.forEach((key, ki) => index.set(key.id, { kind: 'key', path: [ti, bi, bei, ki] }));
+        beat.hits?.forEach((hit, hi) => index.set(hit.id, { kind: 'hit', path: [ti, bi, bei, hi] }));
       });
     });
   });
@@ -88,4 +90,9 @@ export function findNote(score: Score, id: Id): Note | undefined {
 export function trackOf(score: Score, id: Id): Track | undefined {
   const loc = locate(score, id);
   return loc && loc.kind !== 'masterBar' ? score.tracks[loc.path[0]] : undefined;
+}
+
+/** Child array of a beat that holds nodes of this kind. */
+export function beatChildrenKey(kind: 'note' | 'key' | 'hit'): 'notes' | 'keys' | 'hits' {
+  return kind === 'note' ? 'notes' : kind === 'key' ? 'keys' : 'hits';
 }

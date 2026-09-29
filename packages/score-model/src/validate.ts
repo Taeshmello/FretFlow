@@ -1,3 +1,4 @@
+import { DRUM_PIECES, isFretted, PIANO_HIGH, PIANO_LOW } from './instruments';
 import { DURATION_BASES } from './time';
 import type { Score } from './types';
 
@@ -12,6 +13,11 @@ export interface ValidationIssue {
     | 'fretRange'
     | 'pitchMismatch'
     | 'restWithNotes'
+    | 'duplicateKey'
+    | 'keyRange'
+    | 'duplicateHit'
+    | 'drumPiece'
+    | 'wrongNoteKind'
     | 'duration'
     | 'timeSig'
     | 'keySig'
@@ -72,8 +78,37 @@ export function validateScore(score: Score): ValidationIssue[] {
         if (!DURATION_BASES.includes(d.base) || ![0, 1, 2].includes(d.dots)) {
           issues.push({ code: 'duration', message: 'bad duration', id: beat.id });
         }
-        if (beat.rest && beat.notes.length > 0) {
+        const keys = beat.keys ?? [];
+        const hits = beat.hits ?? [];
+        if (beat.rest && (beat.notes.length > 0 || keys.length > 0 || hits.length > 0)) {
           issues.push({ code: 'restWithNotes', message: 'rest beat has notes', id: beat.id });
+        }
+        // Each instrument keeps its own kind of notes (D-023).
+        const fretted = isFretted(track.instrument);
+        if ((!fretted && beat.notes.length) || (track.instrument !== 'piano' && keys.length) || (track.instrument !== 'drums' && hits.length)) {
+          issues.push({ code: 'wrongNoteKind', message: `${track.instrument} track holds notes of another instrument`, id: beat.id });
+        }
+        const pitches = new Set<number>();
+        for (const key of keys) {
+          unique(key.id);
+          if (!Number.isInteger(key.pitch) || key.pitch < PIANO_LOW || key.pitch > PIANO_HIGH) {
+            issues.push({ code: 'keyRange', message: `key ${key.pitch} outside ${PIANO_LOW}..${PIANO_HIGH}`, id: key.id });
+          }
+          if (pitches.has(key.pitch)) {
+            issues.push({ code: 'duplicateKey', message: `key ${key.pitch} twice in one beat`, id: key.id });
+          }
+          pitches.add(key.pitch);
+        }
+        const pieces = new Set<string>();
+        for (const hit of hits) {
+          unique(hit.id);
+          if (!(hit.piece in DRUM_PIECES)) {
+            issues.push({ code: 'drumPiece', message: `unknown drum piece ${String(hit.piece)}`, id: hit.id });
+          }
+          if (pieces.has(hit.piece)) {
+            issues.push({ code: 'duplicateHit', message: `${hit.piece} twice in one beat`, id: hit.id });
+          }
+          pieces.add(hit.piece);
         }
         const strings = new Set<number>();
         for (const note of beat.notes) {

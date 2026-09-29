@@ -130,5 +130,12 @@ export function cloneWithNewIds(score: Score): Score {
 }
 
 export function cloneBeat(beat: Beat): Beat {
-  return { ...clone(beat), id: newId(), notes: beat.notes.map(n => ({ ...clone(n), id: newId() })) };
+  const out: Beat = { ...clone(beat), id: newId(), notes: beat.notes.map(n => ({ ...clone(n), id: newId() })) };
+  if (beat.keys) {
+    out.keys = beat.keys.map(k => ({ ...clone(k), id: newId() }));
+  }
+  if (beat.hits) {
+    out.hits = beat.hits.map(h => ({ ...clone(h), id: newId() }));
+  }
+  return out;
 }

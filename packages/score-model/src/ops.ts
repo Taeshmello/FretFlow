@@ -1,4 +1,4 @@
-import { carryIndex, locate } from './locate';
+import { beatChildrenKey, carryIndex, locate } from './locate';
 import type { Id, NodeKind, NodeOfKind, Score } from './types';
 
 export type Op =
@@ -24,6 +24,8 @@ const PARENT_KIND: Record<NodeKind, NodeKind | null> = {
   bar: 'track',
   beat: 'bar',
   note: 'beat',
+  key: 'beat',
+  hit: 'beat',
 };
 
 // --- immutable path helpers -------------------------------------------------
@@ -65,7 +67,19 @@ function updateChildren(score: Score, kind: NodeKind, parentId: Id | null, fn: (
           if (kind === 'beat') {
             return { ...bar, beats: fn(bar.beats) as typeof bar.beats };
           }
-          return { ...bar, beats: replaceAt(bar.beats, bei, beat => ({ ...beat, notes: fn(beat.notes) as typeof beat.notes })) };
+          const field = beatChildrenKey(kind as 'note' | 'key' | 'hit');
+          return {
+            ...bar,
+            beats: replaceAt(bar.beats, bei, beat => {
+              const items = fn(beat[field] ?? []);
+              // keys/hits are optional: an emptied list goes away so invert round-trips exactly.
+              if (field !== 'notes' && items.length === 0) {
+                const { [field]: _gone, ...rest } = beat;
+                return rest;
+              }
+              return { ...beat, [field]: items };
+            }),
+          };
         }),
       };
     }),
@@ -98,16 +112,20 @@ function updateNode(score: Score, id: Id, fn: (node: Record<string, unknown>) =>
         })),
       };
     case 'note':
+    case 'key':
+    case 'hit': {
+      const field = beatChildrenKey(loc.kind);
       return {
         ...score,
         tracks: replaceAt(score.tracks, p[0], t => ({
           ...t,
           bars: replaceAt(t.bars, p[1], b => ({
             ...b,
-            beats: replaceAt(b.beats, p[2], be => ({ ...be, notes: replaceAt(be.notes, p[3], f) })),
+            beats: replaceAt(b.beats, p[2], be => ({ ...be, [field]: replaceAt((be[field] ?? []) as unknown[], p[3], f) })),
           })),
         })),
       };
+    }
   }
 }
 
@@ -250,6 +268,8 @@ function parentIdOf(score: Score, kind: NodeKind, path: number[]): Id | null {
     case 'beat':
       return score.tracks[ti].bars[bi].id;
     case 'note':
+    case 'key':
+    case 'hit':
       return score.tracks[ti].bars[bi].beats[bei].id;
   }
 }
@@ -266,7 +286,9 @@ function nodeAt(score: Score, kind: NodeKind, path: number[]): unknown {
     case 'beat':
       return score.tracks[a].bars[b].beats[c];
     case 'note':
-      return score.tracks[a].bars[b].beats[c].notes[d];
+    case 'key':
+    case 'hit':
+      return score.tracks[a].bars[b].beats[c][beatChildrenKey(kind)]?.[d];
   }
 }
 

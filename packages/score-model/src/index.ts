@@ -6,3 +6,4 @@ export * from './ops';
 export * from './create';
 export * from './validate';
 export * from './migrate';
+export * from './instruments';

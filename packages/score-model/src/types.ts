@@ -58,8 +58,12 @@ export interface Beat {
   id: Id;
   duration: Duration;
   rest: boolean;
-  /** At most one note per string. */
+  /** Guitar/bass: at most one note per string. Empty on piano and drum tracks. */
   notes: Note[];
+  /** Piano: pitched notes, at most one per pitch. Only on piano tracks. */
+  keys?: KeyNote[];
+  /** Drums: one hit per kit piece. Only on drum tracks. */
+  hits?: DrumHit[];
   /** User-authored chord symbol shown above the stave, e.g. Am7 or G/B. */
   chord?: string;
   /** Syllable or short lyric phrase attached to this beat. */
@@ -82,6 +86,36 @@ export interface Note {
   source: NoteSource;
 }
 
+/** A piano note. Pitch is the whole truth; there is no string or fret. */
+export interface KeyNote {
+  id: Id;
+  /** MIDI pitch, 21 (A0) … 108 (C8). */
+  pitch: number;
+  tieFromPrev?: boolean;
+  source: NoteSource;
+}
+
+export type DrumPiece =
+  | 'kick'
+  | 'snare'
+  | 'sideStick'
+  | 'hihatClosed'
+  | 'hihatOpen'
+  | 'hihatPedal'
+  | 'crash'
+  | 'ride'
+  | 'tomHigh'
+  | 'tomMid'
+  | 'tomLow'
+  | 'tomFloor';
+
+/** One stroke on a kit piece. */
+export interface DrumHit {
+  id: Id;
+  piece: DrumPiece;
+  source: NoteSource;
+}
+
 export type SlideType = 'legato' | 'shift' | 'in' | 'out';
 export type BendType = 'bend' | 'release' | 'bendRelease' | 'prebend';
 export type BendAmount = 0.5 | 1 | 1.5 | 2;
@@ -99,7 +133,7 @@ export interface NoteEffects {
   [k: string]: unknown;
 }
 
-export type NodeKind = 'masterBar' | 'track' | 'bar' | 'beat' | 'note';
+export type NodeKind = 'masterBar' | 'track' | 'bar' | 'beat' | 'note' | 'key' | 'hit';
 
 export interface NodeOfKind {
   masterBar: MasterBar;
@@ -107,4 +141,6 @@ export interface NodeOfKind {
   bar: Bar;
   beat: Beat;
   note: Note;
+  key: KeyNote;
+  hit: DrumHit;
 }
