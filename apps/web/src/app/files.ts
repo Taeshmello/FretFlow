@@ -1,0 +1,74 @@
+import * as alphaTab from '@coderline/alphatab';
+import { exportGp7, exportMidi, importFile, type ImportResult } from '@fretflow/render';
+import { cloneWithNewIds, migrateScore, validateScore, type Score } from '@fretflow/score-model';
+
+export function download(bytes: Uint8Array | string, name: string, type: string): void {
+  const blob = new Blob([typeof bytes === 'string' ? bytes : new Uint8Array(bytes)], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export function safeName(score: Score): string {
+  return (score.meta.title || 'score').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 80);
+}
+
+export const exportAsJson = (score: Score) => download(JSON.stringify(score, null, 2), `${safeName(score)}.fretflow.json`, 'application/json');
+export const exportAsMidi = (score: Score) => download(exportMidi(score), `${safeName(score)}.mid`, 'audio/midi');
+export const exportAsGp = (score: Score) => download(exportGp7(score), `${safeName(score)}.gp`, 'application/octet-stream');
+
+export interface PrintOptions {
+  paper: 'a4' | 'letter';
+  staves: 'scoreTab' | 'tab';
+  /** 1-based inclusive bar range; null = whole score. */
+  range: [number, number] | null;
+}
+
+/**
+ * PDF export = alphaTab's print layout in a new window → the browser's
+ * "Save as PDF" (SPEC §9). The free-tier footer goes in as the score notice.
+ */
+export function printScore(api: alphaTab.AlphaTabApi, opts: PrintOptions): void {
+  const score = api.score;
+  if (!score) {
+    return;
+  }
+  const prevNotice = score.notices;
+  score.notices = 'Made with FretFlow';
+  api.print(opts.paper === 'a4' ? '210mm' : '8.5in', {
+    display: {
+      staveProfile: opts.staves === 'tab' ? alphaTab.StaveProfile.Tab : alphaTab.StaveProfile.ScoreTab,
+      ...(opts.range ? { startBar: opts.range[0], barCount: opts.range[1] - opts.range[0] + 1 } : {}),
+    },
+  });
+  score.notices = prevNotice;
+}
+
+export interface OpenedFile {
+  score: Score;
+  unsupported: Map<string, number>;
+  source: 'gp' | 'json';
+}
+
+/** Opens .gp/.gp3–5/.gpx or our own JSON. Imported scores always get fresh ids. */
+export async function openFile(file: File): Promise<OpenedFile> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (/\.json$/i.test(file.name)) {
+    const score = migrateScore(JSON.parse(new TextDecoder().decode(bytes)));
+    const issues = validateScore(score);
+    if (issues.length) {
+      throw new Error(`The file is not a valid FretFlow score: ${issues[0].message}`);
+    }
+    return { score: cloneWithNewIds(score), unsupported: new Map(), source: 'json' };
+  }
+  let result: ImportResult;
+  try {
+    result = importFile(bytes);
+  } catch (err) {
+    throw new Error(`Could not read this file (${err instanceof Error ? err.message : String(err)}). Supported: Guitar Pro 3–7, FretFlow JSON.`);
+  }
+  return { ...result, source: 'gp' };
+}
