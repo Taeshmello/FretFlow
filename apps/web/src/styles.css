@@ -1711,3 +1711,34 @@ kbd {
     display: none;
   }
 }
+
+/* Phone: the score header wraps; track info stays on one line and the three staff
+   views get their own full-width row instead of being clipped. */
+@media (max-width: 720px) {
+  .score-head {
+    flex-wrap: wrap;
+    row-gap: 6px;
+    padding: 7px 10px;
+  }
+
+  .score-head .head-btn,
+  .score-head .head-btn > span {
+    white-space: nowrap;
+  }
+
+  .score-head .spacer {
+    display: none;
+  }
+
+  .score-head .segmented {
+    order: 10;
+    flex: 1 1 100%;
+    overflow: visible;
+  }
+
+  .score-head .segmented button {
+    flex: 1;
+    white-space: nowrap;
+    padding: 6px 4px;
+  }
+}

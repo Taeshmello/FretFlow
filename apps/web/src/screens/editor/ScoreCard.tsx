@@ -42,7 +42,7 @@ export function ScoreCard(p: Props) {
             <button type="button" className="head-btn">
               <b>{({ guitar: 'Gtr', bass: 'Bass', piano: 'Piano', drums: 'Drums' })[track.instrument]} {trackIndex + 1}</b>
               <span className="muted">
-                {stringInstrument ? `${tuning.replace('Standard', 'E standard')} · capo ${track.capo}` : '오선보 표시 · 전용 입력 준비 중'}
+                {stringInstrument ? `${tuning.replace('Standard', 'E standard')} · capo ${track.capo}` : `${track.instrument === 'drums' ? '타악기 보표' : '오선보'} 표시 · 전용 입력 준비 중`}
               </span>
             </button>
           )}
@@ -71,7 +71,7 @@ export function ScoreCard(p: Props) {
             오선보
           </button>
         </div>}
-        <button
+        {stringInstrument && <button
           type="button"
           className="head-btn muted"
           aria-pressed={editor.settings.advanceAfterInput}
@@ -79,7 +79,7 @@ export function ScoreCard(p: Props) {
           onClick={() => dispatch({ type: 'settings', settings: { advanceAfterInput: !editor.settings.advanceAfterInput } })}
         >
           {editor.settings.advanceAfterInput ? 'Insert mode' : 'Overwrite mode'}
-        </button>
+        </button>}
       </header>
       {p.editable && beat && (
         <div className="chord-strip">
