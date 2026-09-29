@@ -1,10 +1,11 @@
-import { applyOps, findBeat, invert, newId, setOp, type Duration, type Id, type Op, type Instrument, type NoteEffects, type Score } from '@fretflow/score-model';
+import { applyOps, findBeat, invert, isFretted, newId, setOp, type Duration, type DrumPiece, type Id, type Op, type Instrument, type NoteEffects, type Score } from '@fretflow/score-model';
 import { clampCursor, cursorNote, initialCursor, moveBar, moveString, type Cursor, type Selection } from './cursor';
 import { DEFAULT_SETTINGS, type Change, type Settings } from './change';
 import { emptyHistory, popRedo, popUndo, record, type History } from './history';
 import * as bars from './commands/bars';
 import { copy, cut, paste, type Clip } from './commands/clipboard';
 import * as fx from './commands/effects';
+import * as pitched from './commands/pitched';
 import { deleteNote, enterFretDigit, placeFret, type PendingDigit } from './commands/input';
 import { advanceRight } from './commands/navigation';
 import * as rhythm from './commands/rhythm';
@@ -85,6 +86,9 @@ export type Command =
   | { type: 'deleteNote' }
   | { type: 'deleteBeat' }
   | { type: 'tie' }
+  | { type: 'togglePitch'; pitch: number }
+  | { type: 'transposeKeys'; delta: number }
+  | { type: 'toggleHit'; piece: DrumPiece }
   | { type: 'toggleFingeringLock' }
   | { type: 'hammer' }
   | { type: 'slide' }
@@ -158,7 +162,7 @@ function run(state: EditorState, command: Command, now: number, mergeField: bool
   const activeTrack = score.tracks.find(t => t.id === trackId) ?? score.tracks[0];
   if ((activeTrack.instrument === 'piano' || activeTrack.instrument === 'drums')
     && (command.type === 'digit' || command.type === 'placeFret')) {
-    return { ...base, notice: '이 악기는 현재 악보 표시만 지원합니다. 전용 음표 입력은 준비 중입니다.' };
+    return { ...base, notice: activeTrack.instrument === 'piano' ? 'Frets are for guitar and bass. Use the piano keys or letters A–G.' : 'Frets are for guitar and bass. Use the drum pads or number keys.' };
   }
 
   switch (command.type) {
@@ -214,11 +218,20 @@ function run(state: EditorState, command: Command, now: number, mergeField: bool
     case 'insertBeat':
       return commit(base, rhythm.insertBeatAfter(score, cursor), now);
     case 'deleteNote':
-      return selection ? commit(base, cut(score, selection, cursor).change, now) : commit(base, deleteNote(score, cursor), now);
+      if (selection) {
+        return commit(base, cut(score, selection, cursor).change, now);
+      }
+      return commit(base, isFretted(activeTrack.instrument) ? deleteNote(score, cursor) : pitched.clearBeat(score, cursor), now);
     case 'deleteBeat':
       return commit(base, rhythm.deleteBeats(score, cursor, selection), now);
     case 'tie':
-      return commit(base, fx.toggleTie(score, cursor), now);
+      return commit(base, activeTrack.instrument === 'piano' ? pitched.toggleKeyTie(score, cursor) : fx.toggleTie(score, cursor), now);
+    case 'togglePitch':
+      return commit(base, pitched.togglePitch(score, cursor, command.pitch), now);
+    case 'transposeKeys':
+      return commit(base, pitched.transposeKeys(score, cursor, command.delta), now);
+    case 'toggleHit':
+      return commit(base, pitched.toggleHit(score, cursor, command.piece), now);
     case 'toggleFingeringLock': {
       const note = cursorNote(score, cursor);
       return note ? commit(base, { ops: [setOp(score, note.id, ['fingeringLocked'], !note.fingeringLocked)], label: 'fingering lock' }, now) : base;

@@ -6,8 +6,12 @@ import {
   insertOp,
   newId,
   setOp,
+  isFretted,
   type Beat,
+  type DrumHit,
   type Duration,
+  type Instrument,
+  type KeyNote,
   type Note,
   type Op,
   type Score,
@@ -15,10 +19,13 @@ import {
 } from '@fretflow/score-model';
 import { beatsInRange, cursorTrack, selectionRange, type Cursor, type Selection } from '../cursor';
 import type { Change } from '../change';
+import { clearBeatOps } from './pitched';
 
 /** Copied beats with only the notes inside the copied string range. */
 export interface Clip {
-  beats: { duration: Duration; rest: boolean; notes: Note[]; text?: string }[];
+  beats: { duration: Duration; rest: boolean; notes: Note[]; keys?: KeyNote[]; hits?: DrumHit[]; text?: string }[];
+  /** Keys and hits only paste into a track of the same instrument. */
+  instrument: Instrument;
   strings: [number, number];
   tuning: number[];
   capo: number;
@@ -36,9 +43,21 @@ export function copy(score: Score, selection: Selection | null, cursor: Cursor):
   const strings: [number, number] = wholeBeats ? [1, track.tuning.length] : range.strings;
   const beats = beatsInRange(score, range).map(({ beat }) => {
     const notes = beat.notes.filter(n => n.string >= strings[0] && n.string <= strings[1]).map(n => clone(n));
-    return { duration: clone(beat.duration), rest: beat.rest && notes.length === 0, notes, ...(beat.text ? { text: beat.text } : {}) };
+    const keys = beat.keys?.map(k => clone(k));
+    const hits = beat.hits?.map(h => clone(h));
+    const sounding = notes.length + (keys?.length ?? 0) + (hits?.length ?? 0);
+    return {
+      duration: clone(beat.duration),
+      rest: beat.rest && sounding === 0,
+      notes,
+      ...(keys?.length ? { keys } : {}),
+      ...(hits?.length ? { hits } : {}),
+      ...(beat.text ? { text: beat.text } : {}),
+    };
   });
-  return beats.length ? { beats, strings, tuning: [...track.tuning], capo: track.capo, wholeBeats } : null;
+  // Piano and drum beats are always copied whole: there are no strings to pick.
+  const whole = wholeBeats || !isFretted(track.instrument);
+  return beats.length ? { beats, strings, tuning: [...track.tuning], capo: track.capo, wholeBeats: whole, instrument: track.instrument } : null;
 }
 
 /** Ctrl+X: copy, then clear the notes (whole-beat cuts remove the beats). */
@@ -50,6 +69,14 @@ export function cut(score: Score, selection: Selection | null, cursor: Cursor): 
   const range = selectionRange(selection ?? { anchor: cursor, head: cursor });
   const ops: Op[] = [];
   for (const { beat } of beatsInRange(score, range)) {
+    if (!isFretted(clip.instrument)) {
+      const cleared = clearBeatOps(score, beat);
+      ops.push(...cleared);
+      if (cleared.length) {
+        ops.push(setOp(score, beat.id, ['rest'], true));
+      }
+      continue;
+    }
     const removing = beat.notes.filter(n => n.string >= clip.strings[0] && n.string <= clip.strings[1]);
     removing.forEach(n => ops.push(deleteOp(score, n.id)));
     if (removing.length && removing.length === beat.notes.length) {
@@ -109,9 +136,20 @@ export function paste(score: Score, cursor: Cursor, clip: Clip): { change: Chang
 
   if (clip.wholeBeats) {
     clip.beats.forEach((cb, i) => {
-      const { notes, dropped: d } = realise(track, cb, 0);
+      const { notes, dropped: d } = isFretted(track.instrument) ? realise(track, cb, 0) : { notes: [], dropped: cb.notes.length };
       dropped += d;
-      const beat: Beat = { ...createBeat(cb.duration, notes.length === 0), notes, ...(cb.text ? { text: cb.text } : {}) };
+      const same = track.instrument === clip.instrument;
+      const keys = same && track.instrument === 'piano' ? (cb.keys ?? []).map(k => ({ ...clone(k), id: newId() })) : [];
+      const hits = same && track.instrument === 'drums' ? (cb.hits ?? []).map(h => ({ ...clone(h), id: newId() })) : [];
+      dropped += (cb.keys?.length ?? 0) - keys.length + (cb.hits?.length ?? 0) - hits.length;
+      const sounding = notes.length + keys.length + hits.length;
+      const beat: Beat = {
+        ...createBeat(cb.duration, sounding === 0),
+        notes,
+        ...(keys.length ? { keys } : {}),
+        ...(hits.length ? { hits } : {}),
+        ...(cb.text ? { text: cb.text } : {}),
+      };
       ops.push(insertOp('beat', bar.id, cursor.beatIndex + i, beat));
     });
     const last = { ...cursor, beatIndex: cursor.beatIndex + clip.beats.length - 1 };

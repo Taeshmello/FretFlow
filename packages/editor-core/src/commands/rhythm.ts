@@ -11,6 +11,7 @@ import {
 } from '@fretflow/score-model';
 import { beatsInRange, selectionRange, type Cursor, type Selection } from '../cursor';
 import { here, type Change } from '../change';
+import { clearBeatOps } from './pitched';
 
 /** Beats a rhythm command applies to: the selection if any, otherwise the cursor beat. */
 function targets(score: Score, cursor: Cursor, selection: Selection | null): Beat[] {
@@ -76,7 +77,7 @@ export function toggleRest(score: Score, cursor: Cursor, selection: Selection | 
   const ops: Op[] = [];
   for (const beat of beats) {
     if (makeRest) {
-      beat.notes.forEach(n => ops.push(deleteOp(score, n.id)));
+      ops.push(...clearBeatOps(score, beat));
     }
     if (beat.rest !== makeRest) {
       ops.push(setOp(score, beat.id, ['rest'], makeRest));
@@ -117,7 +118,7 @@ export function deleteBeats(score: Score, cursor: Cursor, selection: Selection |
     const keep = removing.length === bar.beats.length ? removing[0] : null;
     for (const beat of removing) {
       if (beat === keep) {
-        beat.notes.forEach(n => ops.push(deleteOp(score, n.id)));
+        ops.push(...clearBeatOps(score, beat));
         if (!beat.rest) {
           ops.push(setOp(score, beat.id, ['rest'], true));
         }

@@ -358,3 +358,74 @@ describe('fingering lock', () => {
     expect(execute(s, { type: 'toggleFingeringLock' }, 0).score).toBe(s.score);
   });
 });
+
+describe('piano input (D-023)', () => {
+  const piano = () => fresh(createScore({ instrument: 'piano', bars: 2 }));
+  const keysOf = (s: EditorState) => cursorBeat(s.score, s.cursor)?.keys?.map(k => k.pitch) ?? [];
+
+  it('adds pitches to the cursor beat as a chord, sorted low to high, and clears the rest', () => {
+    const s = run(piano(), [{ type: 'togglePitch', pitch: 64 }, { type: 'togglePitch', pitch: 60 }, { type: 'togglePitch', pitch: 67 }]);
+    expect(keysOf(s)).toEqual([60, 64, 67]);
+    expect(cursorBeat(s.score, s.cursor)?.rest).toBe(false);
+    expect(validateScore(s.score)).toEqual([]);
+  });
+
+  it('removes a pitch that is already there and turns the beat back into a rest', () => {
+    const s = run(piano(), [{ type: 'togglePitch', pitch: 60 }, { type: 'togglePitch', pitch: 60 }]);
+    expect(keysOf(s)).toEqual([]);
+    expect(cursorBeat(s.score, s.cursor)?.rest).toBe(true);
+  });
+
+  it('transposes the whole chord by semitones and stays inside the piano range', () => {
+    let s = run(piano(), [{ type: 'togglePitch', pitch: 60 }, { type: 'togglePitch', pitch: 64 }, { type: 'transposeKeys', delta: 2 }]);
+    expect(keysOf(s)).toEqual([62, 66]);
+    s = run(fresh(createScore({ instrument: 'piano' })), [{ type: 'togglePitch', pitch: 108 }, { type: 'transposeKeys', delta: 1 }]);
+    expect(keysOf(s)).toEqual([108]);
+  });
+
+  it('undoes a chord note by note', () => {
+    const s = run(piano(), [{ type: 'togglePitch', pitch: 60 }, { type: 'togglePitch', pitch: 64 }, { type: 'undo' }]);
+    expect(keysOf(s)).toEqual([60]);
+  });
+
+  it('clears the beat with Delete and a rest toggle', () => {
+    let s = run(piano(), [{ type: 'togglePitch', pitch: 60 }, { type: 'deleteNote' }]);
+    expect(cursorBeat(s.score, s.cursor)?.rest).toBe(true);
+    s = run(piano(), [{ type: 'togglePitch', pitch: 60 }, { type: 'rest' }]);
+    expect(keysOf(s)).toEqual([]);
+    expect(validateScore(s.score)).toEqual([]);
+  });
+
+  it('ties keys that repeat the previous beat', () => {
+    const s = run(piano(), [{ type: 'togglePitch', pitch: 60 }, { type: 'moveBeat', delta: 1 }, { type: 'togglePitch', pitch: 60 }, { type: 'togglePitch', pitch: 64 }, { type: 'tie' }]);
+    const keys = cursorBeat(s.score, s.cursor)?.keys ?? [];
+    expect(keys.map(k => [k.pitch, !!k.tieFromPrev])).toEqual([[60, true], [64, false]]);
+  });
+
+  it('copies and pastes piano beats into another bar', () => {
+    const s = run(piano(), [{ type: 'togglePitch', pitch: 60 }, { type: 'copy' }, { type: 'moveBar', delta: 1 }, { type: 'paste' }]);
+    expect(s.score.tracks[0].bars[1].beats[0].keys?.map(k => k.pitch)).toEqual([60]);
+    expect(validateScore(s.score)).toEqual([]);
+  });
+});
+
+describe('drum input (D-023)', () => {
+  const drums = () => fresh(createScore({ instrument: 'drums', bars: 1 }));
+  const hitsOf = (s: EditorState) => cursorBeat(s.score, s.cursor)?.hits?.map(h => h.piece) ?? [];
+
+  it('toggles kit pieces on the cursor beat in kit order', () => {
+    const s = run(drums(), [{ type: 'toggleHit', piece: 'snare' }, { type: 'toggleHit', piece: 'kick' }, { type: 'toggleHit', piece: 'hihatClosed' }]);
+    expect(hitsOf(s)).toEqual(['kick', 'snare', 'hihatClosed']);
+    expect(validateScore(s.score)).toEqual([]);
+    const off = run(s, [{ type: 'toggleHit', piece: 'snare' }]);
+    expect(hitsOf(off)).toEqual(['kick', 'hihatClosed']);
+  });
+
+  it('ignores piano and drum commands on the wrong instrument', () => {
+    const g = fresh();
+    expect(execute(g, { type: 'togglePitch', pitch: 60 }, 0).score).toBe(g.score);
+    expect(execute(g, { type: 'toggleHit', piece: 'kick' }, 0).score).toBe(g.score);
+    const d = drums();
+    expect(execute(d, { type: 'togglePitch', pitch: 60 }, 0).score).toBe(d.score);
+  });
+});
