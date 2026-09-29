@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { API_URL } from './persistence';
 
 interface Me {
@@ -23,20 +23,29 @@ export function Account({ onSignedIn }: { onSignedIn: () => void }) {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Parents pass a fresh callback on every render; keep the latest in a ref so the
+  // session check runs once per mount (a dependency on it looped /api/me → refresh → /api/me).
+  const onSignedInRef = useRef(onSignedIn);
+  onSignedInRef.current = onSignedIn;
+
   useEffect(() => {
     if (!API_URL) {
       return;
     }
+    let alive = true;
     api('/api/me')
       .then(async r => {
-        if (r.ok) {
+        if (r.ok && alive) {
           // services/api returns the user fields at the top level.
           setMe((await r.json()) as Me);
-          onSignedIn();
+          onSignedInRef.current();
         }
       })
       .catch(() => {});
-  }, [onSignedIn]);
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   if (!API_URL) {
     return <span className="muted small">로컬 모드 · 이 브라우저에만 저장</span>;
