@@ -1,9 +1,10 @@
 import type * as alphaTab from '@coderline/alphatab';
 import { beatsInRange, selectionRange, type Command, type EditorState } from '@fretflow/editor-core';
-import { beatBox, cellAt, cellBox, toAlphaTab, toAlphaTabString, type Box, type Converted } from '@fretflow/render';
+import { beatBox, cellAt, cellBox, toAlphaTab, type Box, type Converted } from '@fretflow/render';
 import { barFill } from '@fretflow/score-model';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Audition } from '../app/store';
+import { previewPitch } from '../audio/preview';
 import { clearPlaybackLoop } from '../player/clearPlaybackLoop';
 import type { ViewMode } from './useAlphaTab';
 
@@ -58,21 +59,27 @@ export function ScoreView({ api, containerRef, editor, audition, viewMode, dispa
     return api.postRenderFinished.on(() => setLayoutTick(t => t + 1));
   }, [api]);
 
-  // Audition: sound the note that was just entered.
+  // Audition: sound the note that was just entered. This uses the short Web Audio
+  // preview tone, not alphaSynth.playNote: an edit re-renders the score and resets the
+  // synth, and a playNote still starting then throws inside alphaTab (stop before start).
   useEffect(() => {
-    const converted = convertedRef.current;
-    if (!api || !audition || audition.seq === lastAudition.current || !converted) {
+    if (!audition || audition.seq === lastAudition.current) {
       return;
     }
     lastAudition.current = audition.seq;
-    const beat = converted.beats.get(audition.beatId);
-    const track = score.tracks.find(t => t.bars.some(b => b.beats.some(x => x.id === audition.beatId)));
-    const atString = track ? toAlphaTabString(audition.string, track.tuning.length) : -1;
-    const note = beat?.notes.find(n => n.string === atString);
-    if (note && api.isReadyForPlayback) {
-      api.playNote(note);
+    for (const track of score.tracks) {
+      for (const bar of track.bars) {
+        const beat = bar.beats.find(b => b.id === audition.beatId);
+        const note = beat?.notes.find(n => n.string === audition.string);
+        if (beat) {
+          if (note) {
+            previewPitch(note.pitch);
+          }
+          return;
+        }
+      }
     }
-  }, [api, audition, score]);
+  }, [audition, score]);
 
   useLayoutEffect(() => {
     const converted = convertedRef.current;
