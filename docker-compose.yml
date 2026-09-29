@@ -8,7 +8,8 @@ services:
       POSTGRES_PASSWORD: fretflow
       POSTGRES_DB: fretflow
     ports:
-      - "5432:5432"
+      # Override when 5432 is taken locally: POSTGRES_PORT=5433 docker compose up -d
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -17,28 +18,14 @@ services:
       timeout: 3s
       retries: 10
 
-  # S3 stand-in for local audio uploads. Production uses Cloudflare R2.
-  minio:
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
+  # S3 stand-in for local audio uploads (Adobe S3Mock, Apache-2.0). Production uses Cloudflare R2.
+  # MinIO no longer publishes public images, so it was replaced (2026-09-29).
+  s3:
+    image: adobe/s3mock:latest
     environment:
-      MINIO_ROOT_USER: fretflow
-      MINIO_ROOT_PASSWORD: fretflow-dev-secret
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: fretflow-audio
     ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - miniodata:/data
-
-  minio-init:
-    image: minio/mc:latest
-    depends_on:
-      - minio
-    entrypoint: >
-      sh -c "until mc alias set local http://minio:9000 fretflow fretflow-dev-secret; do sleep 1; done &&
-             mc mb --ignore-existing local/fretflow-audio &&
-             mc anonymous set none local/fretflow-audio"
+      - "${S3_PORT:-9000}:9090"
 
 volumes:
   pgdata:
-  miniodata:

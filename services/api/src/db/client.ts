@@ -9,7 +9,7 @@ export { schema };
 export type Db = PgDatabase<PgQueryResultHKT, typeof schema>;
 
 export function createPostgresDb(url: string): { db: Db; close: () => Promise<void> } {
-  const client = postgres(url, { max: 10 });
+  const client = postgres(url, { max: 10, onnotice: () => {} });
   const db = drizzle(client, { schema });
   return { db, close: () => client.end() };
 }

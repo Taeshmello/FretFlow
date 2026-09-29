@@ -20,7 +20,7 @@ export function migrationDatabaseUrl(env: Record<string, string | undefined>): s
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const client = postgres(migrationDatabaseUrl(process.env), { max: 1 });
+  const client = postgres(migrationDatabaseUrl(process.env), { max: 1, onnotice: () => {} });
   await migrate(drizzle(client), { migrationsFolder: MIGRATIONS_FOLDER });
   await client.end();
   console.log('migrations applied');

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { createAuth } from '../src/auth/auth.ts';
 import { migrationDatabaseUrl } from '../src/db/migrate.ts';
 import { loadEnv } from '../src/env.ts';
@@ -116,8 +116,14 @@ describe('createHttpEmailSender', () => {
 });
 
 describe('session cookies', () => {
+  // PGlite startup + migrations can exceed the default 5s test timeout when the
+  // whole workspace suite runs in parallel, so the database is made in a hook.
+  let db: Awaited<ReturnType<typeof createTestDb>>;
+  beforeAll(async () => {
+    db = await createTestDb();
+  }, 30_000);
+
   it('are HttpOnly, Secure and SameSite=Lax when secure cookies are on', async () => {
-    const db = await createTestDb();
     const email = createMemoryEmailSender();
     const auth = createAuth({
       db,
@@ -142,5 +148,5 @@ describe('session cookies', () => {
     expect(session).toMatch(/HttpOnly/i);
     expect(session).toMatch(/Secure/);
     expect(session).toMatch(/SameSite=Lax/i);
-  });
+  }, 15_000);
 });
