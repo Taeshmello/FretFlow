@@ -134,3 +134,14 @@ body {
 .stats td.headline { font-size: 17px; font-weight: 600; }
 .stats .meta { margin: 6px 0 0; font-size: 11px; color: #b9bab4; }
 .stats .conditions { color: #8d8f88; }
+
+.dropzone { position: relative; }
+
+.cursor-box {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  background: rgba(42, 85, 217, 0.18);
+}

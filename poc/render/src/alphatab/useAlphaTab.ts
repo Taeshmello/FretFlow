@@ -48,6 +48,9 @@ export function useAlphaTab(options: AlphaTabOptions): AlphaTabHandle {
         // that does not exist and the dev server answers with index.html.
         // The alphaTab Vite plugin copies the fonts into publicDir, so point there.
         fontDirectory: '/font/',
+        // Required for BeatBounds.notes and for the note mouse events; without it
+        // alphaTab only tracks beat-level boxes.
+        includeNoteBounds: true,
         engine,
         enableLazyLoading,
         useWorkers,

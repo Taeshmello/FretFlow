@@ -24,9 +24,9 @@ pnpm-debug.log*
 .vscode/
 .DS_Store
 
-# 브라우저 확인 산출물
+# 브라우저 확인 산출물 (저장소 루트에 떨어지는 스크린샷)
 .playwright-mcp/
-poc-render-*.png
+/*.png
 
 # iOS / Capacitor (M6 이후)
 ios/App/Pods/
