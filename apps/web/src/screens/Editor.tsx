@@ -1,4 +1,4 @@
-import { cursorBeat, selectionRange, beatsInRange, type Command } from '@fretflow/editor-core';
+import { cursorBeat, cursorTrack, selectionRange, beatsInRange, type Command } from '@fretflow/editor-core';
 import type { Converted } from '@fretflow/render';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { exportAsGp, exportAsJson, exportAsMidi, printScore } from '../app/files';
@@ -6,13 +6,18 @@ import { useEditor, type EditorStore } from '../app/store';
 import { track as trackEvent } from '../app/telemetry';
 import { isTextTarget, mapKey } from '../keymap';
 import { usePlayback } from '../player/usePlayback';
-import { ScoreView } from '../score/ScoreView';
 import { useAlphaTab, type ViewMode } from '../score/useAlphaTab';
-import { AudioPanel } from '../audio/AudioPanel';
+import { useRecording } from '../audio/useRecording';
+import { WaveformCard } from '../audio/WaveformCard';
 import { ExportDialog, HelpDialog } from '../ui/Dialogs';
-import { Fretboard } from '../ui/Fretboard';
-import { Inspector } from '../ui/Inspector';
-import { Toolbar } from '../ui/Toolbar';
+import { Fretboard, KeyboardHints } from '../ui/Fretboard';
+import { NotePanel } from '../ui/NotePanel';
+import { TempoSettings } from '../ui/Settings';
+import { ScoreCard } from './editor/ScoreCard';
+import { TopBar, type Mode } from './editor/TopBar';
+import { TransportBar } from './editor/TransportBar';
+import { TouchInput } from './editor/TouchInput';
+import { PracticePanel } from './editor/PracticePanel';
 
 interface Props {
   store: EditorStore;
@@ -27,14 +32,17 @@ export function Editor({ store, onBack, saveLabel, saveError }: Props) {
   const { containerRef, api, error } = useAlphaTab(scrollRef);
   const playback = usePlayback(api);
   const [viewMode, setViewMode] = useState<ViewMode>('scoreTab');
+  const [mode, setMode] = useState<Mode>('write');
   const [dialog, setDialog] = useState<'export' | 'help' | null>(null);
-  const [showFretboard, setShowFretboard] = useState(true);
-  const [showAudio, setShowAudio] = useState(false);
   const convertedRef = useRef<Converted | null>(null);
   const onConverted = useCallback((c: Converted) => {
     convertedRef.current = c;
   }, []);
   const dispatch = store.dispatch;
+
+  useEffect(() => {
+    playback.update({ looping: false });
+  }, [editor.score, playback.update]);
 
   // Dev-only handle for latency benchmarks (CLAUDE.md performance budget).
   useEffect(() => {
@@ -57,6 +65,13 @@ export function Editor({ store, onBack, saveLabel, saveError }: Props) {
     },
     [api],
   );
+  const recording = useRecording(editor.score.id, editor.score, {
+    setVolume: v => playback.update({ volume: v }),
+    play: playback.playFromTick,
+    pause: playback.pause,
+    getTick: getSynthTick,
+    seek: seekSynth,
+  });
 
   const loopSelection = useCallback(() => {
     const { selection, score, cursor } = store.state;
@@ -106,89 +121,145 @@ export function Editor({ store, onBack, saveLabel, saveError }: Props) {
 
   const sel = editor.selection ? selectionRange(editor.selection) : null;
   const selectedBars: [number, number] | null = sel ? [sel.from.barIndex + 1, sel.to.barIndex + 1] : null;
-  const track = editor.score.tracks.find(t => t.id === editor.cursor.trackId);
+  const tempo = editor.score.masterBars[editor.cursor.barIndex]?.tempo ?? editor.score.masterBars[0]?.tempo ?? 120;
+  const loopLabel = selectedBars
+    ? `Loop bars ${selectedBars[0]}${selectedBars[1] === selectedBars[0] ? '' : `–${selectedBars[1]}`}`
+    : playback.state.looping || recording.loop
+      ? 'Loop active'
+      : null;
+  const looping = playback.state.looping || !!recording.loop;
+  const fmt = (ms: number) => {
+    const seconds = Math.max(0, Math.floor(ms / 1000));
+    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  };
+  const position = `Bar ${editor.cursor.barIndex + 1} · beat ${editor.cursor.beatIndex + 1}`;
+  const activeTrack = cursorTrack(editor.score, editor.cursor);
+  const stringInstrument = activeTrack.instrument === 'guitar' || activeTrack.instrument === 'bass';
+
+  function toggleLoop() {
+    if (recording.loaded) {
+      if (recording.loop) {
+        recording.setLoop(null);
+      } else {
+        const bars = selectedBars ?? [editor.cursor.barIndex + 1, editor.cursor.barIndex + 1];
+        recording.loopBars(bars[0] - 1, bars[1] - 1);
+      }
+      return;
+    }
+    loopSelection();
+  }
+
+  function setSpeed(speed: number) {
+    recording.setRate(speed);
+    playback.update({ speed });
+  }
+
+  function toggleMetronome() {
+    if (recording.loaded) {
+      recording.setMetronome(!recording.metronome);
+    } else {
+      playback.update({ metronome: !playback.state.metronome });
+    }
+  }
+
+  function playMain() {
+    if (recording.loaded) {
+      if (recording.playing) {
+        recording.pause();
+      } else {
+        recording.playTogether();
+      }
+      return;
+    }
+    playPause();
+  }
 
   return (
-    <div className="editor">
-      <header className="topbar">
-        <button type="button" className="ghost back" onClick={onBack} aria-label="악보 목록">
-          ←
-        </button>
-        <div className="title-edit">
-          <input
-            aria-label="제목"
-            value={editor.score.meta.title}
-            onChange={e => dispatch({ type: 'setTitle', title: e.target.value })}
-          />
-          <input
-            aria-label="아티스트"
-            className="artist"
-            placeholder="아티스트"
-            value={editor.score.meta.artist ?? ''}
-            onChange={e => dispatch({ type: 'setTitle', title: editor.score.meta.title, artist: e.target.value })}
-          />
-        </div>
-        <span className={`save-status${saveError ? ' is-error' : ''}`} role="status">
-          {saveLabel}
-        </span>
-        <span className="where">
-          {track?.name} · 마디 {editor.cursor.barIndex + 1}/{editor.score.masterBars.length} · 박 {editor.cursor.beatIndex + 1} · {editor.cursor.string}번 현
-        </span>
-      </header>
+    <div className={`editor editor-v2 mode-${mode}`}>
+      <TopBar
+        title={editor.score.meta.title}
+        artist={editor.score.meta.artist ?? ''}
+        onTitle={title => dispatch({ type: 'setTitle', title, artist: editor.score.meta.artist })}
+        saveLabel={saveLabel}
+        saveError={saveError}
+        mode={mode}
+        onMode={setMode}
+        canUndo={editor.history.undo.length > 0}
+        canRedo={editor.history.redo.length > 0}
+        onUndo={() => dispatch({ type: 'undo' })}
+        onRedo={() => dispatch({ type: 'redo' })}
+        onExport={() => setDialog('export')}
+        onBack={onBack}
+      />
       {saveError && <div className="banner error">저장에 실패했습니다. 브라우저 저장 공간을 확인하세요. 편집 내용은 다음 저장 때 다시 시도합니다.</div>}
       {error && <div className="banner error">악보 표시 오류: {error}</div>}
       {editor.notice && <div className="banner">{editor.notice}</div>}
-      <Toolbar
-        editor={editor}
-        dispatch={dispatch}
-        playback={playback.state}
-        onPlayPause={playPause}
-        onStop={playback.stop}
-        onPlayback={playback.update}
-        onLoopSelection={loopSelection}
-        viewMode={viewMode}
-        onViewMode={setViewMode}
-        onExport={() => setDialog('export')}
-        onHelp={() => setDialog('help')}
+      <TransportBar
+        playing={recording.loaded ? recording.playing : playback.state.playing}
+        ready={recording.loaded || playback.state.ready}
+        position={recording.loaded ? `${fmt(recording.time * 1000)} / ${fmt(recording.duration * 1000)}` : position}
+        onPlayPause={playMain}
+        loopLabel={loopLabel}
+        looping={looping}
+        canLoop={mode === 'practice' || !!selectedBars}
+        onLoop={toggleLoop}
+        speed={recording.loaded ? recording.rate : playback.state.speed}
+        onSpeed={setSpeed}
+        tempo={tempo}
+        tempoEditor={<TempoSettings editor={editor} dispatch={dispatch} />}
+        click={recording.loaded ? recording.metronome : playback.state.metronome}
+        onClick={toggleMetronome}
+        countIn={playback.state.countIn}
+        onCountIn={() => playback.update({ countIn: !playback.state.countIn })}
+        hasRecording={recording.loaded}
+        onRecording={() => document.querySelector<HTMLInputElement>('.wave-card input[type="file"]')?.click()}
+        mix={recording.mix}
+        onMix={recording.setMix}
       />
-      <div className="workspace">
-        <main className="score-scroll" ref={scrollRef} aria-label="Score">
-          <ScoreView
+      <div className="editor-body">
+        <main className="editor-stack">
+          <WaveformCard
+            rec={recording}
+            score={editor.score}
+            showBeatMap={mode === 'practice'}
+            onSetTempo={bpm => dispatch({ type: 'setMasterBar', prop: 'tempo', value: bpm, barIndex: 0 })}
+          />
+          <ScoreCard
             api={api}
             containerRef={containerRef}
+            scrollRef={scrollRef}
             editor={editor}
             audition={audition}
             viewMode={viewMode}
+            onViewMode={setViewMode}
             dispatch={dispatch}
             onConverted={onConverted}
+            muted={playback.muted}
+            onToggleMute={playback.toggleMute}
+            editable={mode === 'write'}
           />
+          {mode === 'write' && stringInstrument && (
+            <div className="fret-row">
+              <Fretboard editor={editor} dispatch={dispatch} />
+              <KeyboardHints onAll={() => setDialog('help')} />
+            </div>
+          )}
         </main>
-        <Inspector editor={editor} dispatch={dispatch} muted={playback.muted} onToggleMute={playback.toggleMute} />
-      </div>
-      <div className="dock">
-        <div className="dock-tabs">
-          <button type="button" aria-pressed={showFretboard} onClick={() => setShowFretboard(v => !v)}>
-            지판
-          </button>
-          <button type="button" aria-pressed={showAudio} onClick={() => setShowAudio(v => !v)}>
-            음원
-          </button>
-        </div>
-        {showFretboard && <Fretboard editor={editor} dispatch={dispatch} />}
-        <div hidden={!showAudio}>
-          <AudioPanel
-            scoreId={editor.score.id}
-            score={editor.score}
-            synthVolume={v => playback.update({ volume: v })}
-            selectedBars={selectedBars}
-            onSetTempo={bpm => dispatch({ type: 'setMasterBar', prop: 'tempo', value: bpm, barIndex: 0 })}
-            onSynthPlay={playback.playFromTick}
-            onSynthPause={playback.pause}
-            getSynthTick={getSynthTick}
-            onSynthSeek={seekSynth}
+        {mode === 'write' ? (stringInstrument ? <NotePanel editor={editor} dispatch={dispatch} /> : <aside className="card practice-rail"><h3>전용 입력 준비 중</h3><p>피아노·드럼은 현재 오선보 표시와 기본 악보 설정을 지원합니다. 음표 입력은 후속 단계에서 추가됩니다.</p></aside>) : (
+          <PracticePanel
+            speed={recording.loaded ? recording.rate : playback.state.speed}
+            onSpeed={setSpeed}
+            looping={looping}
+            loopBars={selectedBars}
+            currentBar={editor.cursor.barIndex + 1}
+            onLoop={toggleLoop}
+            metronome={recording.loaded ? recording.metronome : playback.state.metronome}
+            onMetronome={toggleMetronome}
+            hasRecording={recording.loaded}
           />
-        </div>
+        )}
       </div>
+      {mode === 'write' && stringInstrument && <TouchInput editor={editor} dispatch={dispatch} />}
       {dialog === 'help' && <HelpDialog onClose={() => setDialog(null)} />}
       {dialog === 'export' && (
         <ExportDialog

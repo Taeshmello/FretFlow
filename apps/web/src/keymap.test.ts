@@ -36,6 +36,11 @@ describe('mapKey (SPEC §5.2)', () => {
     expect(mapKey(k('3', { ctrlKey: true }))).toEqual({ command: { type: 'tuplet' } });
   });
 
+  it('maps P to hammer/pull and Cmd+K to the command list', () => {
+    expect(mapKey(k('p'))).toEqual({ command: { type: 'hammer' } });
+    expect(mapKey(k('k', { metaKey: true }))).toEqual({ shell: 'help' });
+  });
+
   it('leaves Space to the shell for play/pause', () => {
     expect(mapKey(k(' '))).toEqual({ shell: 'playPause' });
   });

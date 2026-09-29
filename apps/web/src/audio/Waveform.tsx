@@ -38,15 +38,19 @@ export function Waveform({ peaks, duration, time, loop, barLines, onSeek, onLoop
     }
     const x = (s: number) => (s / duration) * width;
     if (loop) {
-      ctx.fillStyle = 'rgba(232, 102, 61, 0.16)';
+      ctx.fillStyle = 'rgba(214, 160, 60, 0.26)';
       ctx.fillRect(x(loop.start), 0, x(loop.end) - x(loop.start), HEIGHT);
+      ctx.fillStyle = '#c08a2e';
+      ctx.fillRect(x(loop.start) - 1, 0, 3, HEIGHT);
+      ctx.fillRect(x(loop.end) - 1, 0, 3, HEIGHT);
     }
     // Fine level when there are more pixels than coarse peaks.
     const level = peaks.coarse.max.length >= width ? peaks.coarse : peaks.fine;
     const n = level.max.length;
     const mid = HEIGHT / 2;
-    ctx.fillStyle = '#8a8d85';
+    const inLoop = (px: number) => !!loop && px >= x(loop.start) && px <= x(loop.end);
     for (let px = 0; px < width; px++) {
+      ctx.fillStyle = inLoop(px) ? '#c08a2e' : '#9a9c95';
       const from = Math.floor((px / width) * n);
       const to = Math.max(from + 1, Math.floor(((px + 1) / width) * n));
       let lo = 0;
@@ -57,20 +61,31 @@ export function Waveform({ peaks, duration, time, loop, barLines, onSeek, onLoop
       }
       ctx.fillRect(px, mid - hi * mid, 1, Math.max(1, (hi - lo) * mid));
     }
+    // Bar lines with bar numbers; label density follows the zoom.
+    const gap = barLines.length > 1 ? x(barLines[1].seconds) - x(barLines[0].seconds) : width;
+    const every = gap >= 36 ? 1 : gap >= 12 ? 4 : 8;
+    ctx.font = '11px "JetBrains Mono Variable", ui-monospace, monospace';
     for (const line of barLines) {
       const lx = x(line.seconds);
       if (lx < 0 || lx > width) {
         continue;
       }
-      ctx.fillStyle = line.anchored ? '#4078d2' : 'rgba(64, 120, 210, 0.35)';
-      ctx.fillRect(lx, 0, line.anchored ? 2 : 1, HEIGHT);
-      if (line.bar % 4 === 0 || line.anchored) {
-        ctx.font = '10px system-ui';
-        ctx.fillText(String(line.bar + 1), lx + 3, 10);
+      ctx.fillStyle = 'rgba(28, 29, 26, 0.18)';
+      ctx.fillRect(lx, 0, 1, HEIGHT);
+      if (line.bar % every === 0) {
+        ctx.fillStyle = '#6e706a';
+        ctx.fillText(String(line.bar + 1), lx + 4, 12);
       }
     }
-    ctx.fillStyle = '#e8663d';
-    ctx.fillRect(x(time), 0, 2, HEIGHT);
+    // Playhead: blue line with a small triangle on top.
+    const px = x(time);
+    ctx.fillStyle = '#3a57d6';
+    ctx.fillRect(px - 1, 0, 2, HEIGHT);
+    ctx.beginPath();
+    ctx.moveTo(px - 6, 0);
+    ctx.lineTo(px + 6, 0);
+    ctx.lineTo(px, 8);
+    ctx.fill();
   }, [peaks, duration, time, loop, barLines]);
 
   const secondsAt = (clientX: number) => {

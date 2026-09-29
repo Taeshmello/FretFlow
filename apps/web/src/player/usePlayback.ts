@@ -2,6 +2,7 @@ import * as alphaTab from '@coderline/alphatab';
 import type { Converted } from '@fretflow/render';
 import type { Beat } from '@fretflow/score-model';
 import { useCallback, useEffect, useState } from 'react';
+import { clearPlaybackLoop } from './clearPlaybackLoop';
 
 export interface PlaybackState {
   ready: boolean;
@@ -141,8 +142,7 @@ export function usePlayback(api: alphaTab.AlphaTabApi | null) {
         api.applyPlaybackRangeFromHighlight();
         update({ looping: true });
       } else {
-        api.clearPlaybackRangeHighlight();
-        api.playbackRange = null;
+        clearPlaybackLoop(api);
         update({ looping: false });
       }
     },

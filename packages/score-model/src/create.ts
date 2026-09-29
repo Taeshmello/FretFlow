@@ -61,14 +61,16 @@ export interface CreateTrackOptions {
 
 export function createTrack(masterBars: readonly MasterBar[], options: CreateTrackOptions = {}): Track {
   const instrument = options.instrument ?? 'guitar';
-  const fallback = TUNING_PRESETS.find(p => p.id === (instrument === 'bass' ? 'bassStandard' : 'standard'));
+  const fallback = instrument === 'piano' || instrument === 'drums'
+    ? undefined
+    : TUNING_PRESETS.find(p => p.id === (instrument === 'bass' ? 'bassStandard' : 'standard'));
   return {
     id: newId(),
-    name: options.name ?? (instrument === 'bass' ? 'Bass' : 'Guitar'),
+    name: options.name ?? ({ guitar: 'Guitar', bass: 'Bass', piano: 'Piano', drums: 'Drums' })[instrument],
     instrument,
     tuning: [...(options.tuning ?? fallback?.tuning ?? [])],
     capo: options.capo ?? 0,
-    maxFret: options.maxFret ?? DEFAULT_MAX_FRET,
+    maxFret: options.maxFret ?? (instrument === 'piano' || instrument === 'drums' ? 0 : DEFAULT_MAX_FRET),
     bars: masterBars.map(createBar),
   };
 }

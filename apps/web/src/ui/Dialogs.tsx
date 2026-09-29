@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { PrintOptions } from '../app/files';
 
-export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
+export function Modal({ title, onClose, children, wide, className = '' }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; className?: string }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const d = ref.current;
@@ -10,7 +10,7 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
     }
   }, []);
   return (
-    <dialog ref={ref} className={`modal${wide ? ' wide' : ''}`} onClose={onClose} onCancel={onClose} aria-label={title}>
+    <dialog ref={ref} className={`modal${wide ? ' wide' : ''} ${className}`} onClose={onClose} onCancel={onClose} aria-label={title}>
       <header>
         <h2>{title}</h2>
         <button type="button" className="icon" aria-label="닫기" onClick={onClose}>
@@ -36,48 +36,64 @@ export function ExportDialog(p: ExportProps) {
   const [paper, setPaper] = useState<PrintOptions['paper']>('a4');
   const [staves, setStaves] = useState<PrintOptions['staves']>('scoreTab');
   const [useSelection, setUseSelection] = useState(false);
+  const [format, setFormat] = useState<'pdf' | 'midi' | 'gp' | 'json'>('pdf');
+  const selections = [
+    { id: 'pdf', title: 'PDF', detail: '인쇄하거나 어디서든 읽기' },
+    { id: 'midi', title: 'MIDI', detail: '음악 제작 프로그램에서 열기' },
+    { id: 'gp', title: 'Guitar Pro', detail: '다른 편집기에서 이어 쓰기' },
+    { id: 'json', title: 'FretFlow 파일', detail: '악보 전체 백업' },
+  ] as const;
+  const exportFile = () => {
+    if (format === 'pdf') {
+      p.onPdf({ paper, staves, range: useSelection && p.selection ? p.selection : null });
+    } else if (format === 'midi') {
+      p.onMidi();
+    } else if (format === 'gp') {
+      p.onGp();
+    } else {
+      p.onJson();
+    }
+  };
   return (
-    <Modal title="내보내기" onClose={p.onClose}>
-      <section className="export-block">
-        <h3>PDF</h3>
-        <div className="field-row">
-          <label className="field">
-            용지
-            <select value={paper} onChange={e => setPaper(e.target.value as PrintOptions['paper'])}>
-              <option value="a4">A4</option>
-              <option value="letter">Letter</option>
-            </select>
-          </label>
-          <label className="field">
-            표시
-            <select value={staves} onChange={e => setStaves(e.target.value as PrintOptions['staves'])}>
-              <option value="scoreTab">오선보 + TAB</option>
-              <option value="tab">TAB만</option>
-            </select>
-          </label>
+    <Modal title="내보내기" onClose={p.onClose} wide className="export-modal">
+      <div className="export-layout">
+        <div className="export-options">
+          <div className="export-formats" role="radiogroup" aria-label="파일 형식">
+            {selections.map(item => (
+              <button key={item.id} type="button" className="export-format" role="radio" aria-checked={format === item.id} onClick={() => setFormat(item.id)}>
+                <b>{item.title}</b><small>{item.detail}</small>
+              </button>
+            ))}
+          </div>
+          {format === 'pdf' && (
+            <div className="export-pdf-options">
+              <fieldset className="form-group">
+                <legend>표시</legend>
+                <div className="segmented"><button type="button" aria-pressed={staves === 'scoreTab'} onClick={() => setStaves('scoreTab')}>오선보 + TAB</button><button type="button" aria-pressed={staves === 'tab'} onClick={() => setStaves('tab')}>TAB만</button><button type="button" aria-pressed={staves === 'score'} onClick={() => setStaves('score')}>오선보만</button></div>
+              </fieldset>
+              <fieldset className="form-group">
+                <legend>마디</legend>
+                <div className="segmented"><button type="button" aria-pressed={!useSelection} onClick={() => setUseSelection(false)}>전체 (1–{p.barCount})</button><button type="button" aria-pressed={useSelection} disabled={!p.selection} onClick={() => setUseSelection(true)}>선택 {p.selection ? `${p.selection[0]}–${p.selection[1]}` : '없음'}</button></div>
+              </fieldset>
+              <fieldset className="form-group">
+                <legend>용지</legend>
+                <div className="segmented"><button type="button" aria-pressed={paper === 'letter'} onClick={() => setPaper('letter')}>Letter</button><button type="button" aria-pressed={paper === 'a4'} onClick={() => setPaper('a4')}>A4</button></div>
+              </fieldset>
+            </div>
+          )}
+          <p className="muted small export-help">{format === 'pdf' ? '브라우저 인쇄 창에서 PDF로 저장할 수 있습니다. 하단에 Made with FretFlow가 표시됩니다.' : '음원과 비트 맵은 내보내는 악보 파일에 포함되지 않습니다.'}</p>
         </div>
-        <label className="check">
-          <input type="checkbox" disabled={!p.selection} checked={useSelection && !!p.selection} onChange={e => setUseSelection(e.target.checked)} />
-          선택한 마디만 {p.selection ? `(${p.selection[0]}–${p.selection[1]})` : '(선택 없음)'}
-        </label>
-        <p className="muted small">인쇄 창에서 “PDF로 저장”을 고르세요. 하단에 “Made with FretFlow”가 들어갑니다.</p>
-        <button
-          type="button"
-          className="primary"
-          onClick={() => p.onPdf({ paper, staves, range: useSelection && p.selection ? p.selection : null })}
-        >
-          PDF 만들기
-        </button>
-      </section>
-      <section className="export-block">
-        <h3>파일</h3>
-        <div className="chips">
-          <button type="button" className="chip" onClick={p.onMidi}>MIDI (.mid)</button>
-          <button type="button" className="chip" onClick={p.onGp}>Guitar Pro (.gp)</button>
-          <button type="button" className="chip" onClick={p.onJson}>FretFlow (.json)</button>
+        <div className="export-preview" aria-label="용지 배치 예시">
+          <div className={`preview-page ${paper}`}>
+            <div className="preview-title">악보 내보내기</div>
+            <div className="preview-caption">{staves === 'scoreTab' ? '오선보 + TAB' : staves === 'score' ? '오선보' : 'TAB'} · {paper.toUpperCase()}</div>
+            <div className="preview-system" /><div className="preview-system" /><div className="preview-system" />
+            <div className="preview-footer">Made with FretFlow</div>
+          </div>
+          <span className="muted small">배치 예시 · 실제 악보는 인쇄 창에서 확인</span>
         </div>
-        <p className="muted small">음원과 비트 맵은 파일에 포함되지 않습니다.</p>
-      </section>
+      </div>
+      <footer className="export-actions"><button type="button" className="btn" onClick={p.onClose}>취소</button><button type="button" className="btn primary" onClick={exportFile}>{format === 'pdf' ? '인쇄 / PDF로 저장' : '파일 다운로드'}</button></footer>
     </Modal>
   );
 }

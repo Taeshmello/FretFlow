@@ -49,7 +49,9 @@ export function validateScore(score: Score): ValidationIssue[] {
 
   for (const track of score.tracks) {
     unique(track.id);
-    if (track.tuning.length < 1 || track.tuning.some(p => !Number.isInteger(p) || p < 0 || p > 127)) {
+    if (((track.instrument === 'guitar' || track.instrument === 'bass') && track.tuning.length < 1)
+      || ((track.instrument === 'piano' || track.instrument === 'drums') && track.tuning.length !== 0)
+      || track.tuning.some(p => !Number.isInteger(p) || p < 0 || p > 127)) {
       issues.push({ code: 'tuning', message: 'tuning must be MIDI pitches', id: track.id });
     }
     if (track.bars.length !== score.masterBars.length) {

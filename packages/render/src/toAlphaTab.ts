@@ -27,7 +27,7 @@ export interface Converted {
 }
 
 /** General MIDI programs: steel guitar, clean electric, finger bass. */
-const PROGRAM = { guitar: 27, bass: 33 } as const;
+const PROGRAM = { guitar: 27, bass: 33, piano: 0, drums: 0 } as const;
 
 function slideOut(slide: NoteEffects['slide']): alphaTab.model.SlideOutType {
   switch (slide) {
@@ -93,6 +93,9 @@ function convertBeat(beat: Beat, stringCount: number): alphaTab.model.Beat {
   if (beat.text) {
     b.text = beat.text;
   }
+  if (beat.lyric) {
+    b.lyrics = [beat.lyric];
+  }
   // No notes = rest in alphaTab.
   if (!beat.rest) {
     for (const note of beat.notes) {
@@ -134,12 +137,14 @@ function convertTrack(
   t.playbackInfo.secondaryChannel = trackIndex * 2 + 1;
   const staff = new at.Staff();
   // Same order as ours: [0] is the highest string.
-  staff.stringTuning = new at.Tuning('', [...track.tuning], false);
+  if (track.tuning.length) staff.stringTuning = new at.Tuning('', [...track.tuning], false);
   staff.capo = track.capo;
-  staff.showTablature = options.staffMode !== 'score';
-  staff.showStandardNotation = options.staffMode !== 'tab';
+  const strings = track.instrument === 'guitar' || track.instrument === 'bass';
+  staff.showTablature = strings && options.staffMode !== 'score';
+  staff.showStandardNotation = !strings || options.staffMode !== 'tab';
+  staff.isPercussion = track.instrument === 'drums';
   // Guitar and bass are written an octave above how they sound.
-  staff.displayTranspositionPitch = -12;
+  staff.displayTranspositionPitch = strings ? -12 : 0;
   t.addStaff(staff);
 
   const stringCount = track.tuning.length;
@@ -148,11 +153,24 @@ function convertTrack(
     b.keySignature = (score.masterBars[barIndex]?.keySig ?? 0) as alphaTab.model.KeySignature;
     if (track.instrument === 'bass') {
       b.clef = at.Clef.F4;
+    } else if (track.instrument === 'drums') {
+      b.clef = at.Clef.Neutral;
     }
     const voice = new at.Voice();
     b.addVoice(voice);
     bar.beats.forEach((beat, beatIndex) => {
       const converted = convertBeat(beat, stringCount);
+      if (beat.chord && stringCount) {
+        const chord = new at.Chord();
+        chord.name = beat.chord;
+        chord.showName = true;
+        chord.showDiagram = false;
+        chord.showFingering = false;
+        chord.strings = Array(stringCount).fill(-1);
+        const chordId = `beat-chord-${beat.id}`;
+        staff.addChord(chordId, chord);
+        converted.chordId = chordId;
+      }
       voice.addBeat(converted);
       out.beats.set(beat.id, converted);
       out.refs.set(converted, { trackIndex, barIndex, beatIndex, beatId: beat.id });

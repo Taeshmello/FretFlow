@@ -33,7 +33,7 @@ function repitchOps(score: Score, trackId: string, tuning: number[], capo: numbe
 
 export function setTuning(score: Score, trackId: string, tuning: number[]): Change | null {
   const track = score.tracks.find(t => t.id === trackId);
-  if (!track || tuning.length < 1 || tuning.some(p => !Number.isInteger(p) || p < 0 || p > 127)) {
+  if (!track || track.instrument === 'piano' || track.instrument === 'drums' || tuning.length < 1 || tuning.some(p => !Number.isInteger(p) || p < 0 || p > 127)) {
     return null;
   }
   return {
@@ -44,7 +44,7 @@ export function setTuning(score: Score, trackId: string, tuning: number[]): Chan
 
 export function setCapo(score: Score, trackId: string, capo: number): Change | null {
   const track = score.tracks.find(t => t.id === trackId);
-  if (!track || !Number.isInteger(capo) || capo < 0 || capo > 12) {
+  if (!track || track.instrument === 'piano' || track.instrument === 'drums' || !Number.isInteger(capo) || capo < 0 || capo > 12) {
     return null;
   }
   return { ops: [setOp(score, trackId, ['capo'], capo), ...repitchOps(score, trackId, track.tuning, capo)], label: 'capo' };

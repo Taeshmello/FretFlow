@@ -26,7 +26,7 @@ export interface MasterBar {
   section?: string;
 }
 
-export type Instrument = 'guitar' | 'bass';
+export type Instrument = 'guitar' | 'bass' | 'piano' | 'drums';
 
 export interface Track {
   id: Id;
@@ -60,6 +60,10 @@ export interface Beat {
   rest: boolean;
   /** At most one note per string. */
   notes: Note[];
+  /** User-authored chord symbol shown above the stave, e.g. Am7 or G/B. */
+  chord?: string;
+  /** Syllable or short lyric phrase attached to this beat. */
+  lyric?: string;
   text?: string;
 }
 

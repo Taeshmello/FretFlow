@@ -1,7 +1,7 @@
 import * as alphaTab from '@coderline/alphatab';
 import { useEffect, useRef, useState } from 'react';
 
-export type ViewMode = 'scoreTab' | 'tab';
+export type ViewMode = 'scoreTab' | 'tab' | 'score';
 
 /**
  * Owns the AlphaTabApi. Settings follow D-015: workers off (their round trip
@@ -40,6 +40,13 @@ export function useAlphaTab(scrollElement: React.RefObject<HTMLElement | null>) 
           [alphaTab.NotationElement.EffectDynamics, false],
           // Only the print layout shows the "Made with FretFlow" copyright line.
           [alphaTab.NotationElement.ScoreCopyright, false],
+          // The score card header shows title, track and tuning (design page 1); print shows them.
+          [alphaTab.NotationElement.ScoreTitle, false],
+          [alphaTab.NotationElement.ScoreSubTitle, false],
+          [alphaTab.NotationElement.ScoreArtist, false],
+          [alphaTab.NotationElement.ScoreWordsAndMusic, false],
+          [alphaTab.NotationElement.GuitarTuning, false],
+          [alphaTab.NotationElement.TrackNames, false],
           // Show "H"/"P" and "sl." so techniques are readable in the tab.
           [alphaTab.NotationElement.EffectHammerOnPullOffText, true],
           [alphaTab.NotationElement.EffectSlideText, true],

@@ -1,6 +1,7 @@
-import { createScore, TUNING_PRESETS, type Instrument, type Score } from '@fretflow/score-model';
+import type { Score } from '@fretflow/score-model';
 import type { ScoreSummary } from '@fretflow/storage';
 import { useState } from 'react';
+import { NewScoreDialog } from './NewScoreDialog';
 
 interface Props {
   scores: ScoreSummary[];
@@ -11,100 +12,6 @@ interface Props {
   onDelete: (id: string) => void;
   importError: string | null;
   account: React.ReactNode;
-}
-
-function NewScoreForm({ onCreate, onCancel }: { onCreate: (s: Score) => void; onCancel: () => void }) {
-  const [title, setTitle] = useState('');
-  const [artist, setArtist] = useState('');
-  const [instrument, setInstrument] = useState<Instrument>('guitar');
-  const [tuningId, setTuningId] = useState('standard');
-  const [capo, setCapo] = useState(0);
-  const [timeSig, setTimeSig] = useState('4/4');
-  const [tempo, setTempo] = useState(120);
-  const presets = TUNING_PRESETS.filter(p => p.instrument === instrument);
-
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const preset = presets.find(p => p.id === tuningId) ?? presets[0];
-    onCreate(
-      createScore({
-        title: title.trim() || '제목 없음',
-        artist: artist.trim() || undefined,
-        instrument,
-        tuning: preset.tuning,
-        capo,
-        timeSig: timeSig.split('/').map(Number) as [number, number],
-        tempo,
-        bars: 8,
-      }),
-    );
-  }
-
-  return (
-    <form className="new-score" onSubmit={submit}>
-      <h2>새 악보</h2>
-      <div className="field-row">
-        <label className="field grow">
-          제목
-          <input autoFocus value={title} placeholder="제목 없음" onChange={e => setTitle(e.target.value)} />
-        </label>
-        <label className="field grow">
-          아티스트
-          <input value={artist} onChange={e => setArtist(e.target.value)} />
-        </label>
-      </div>
-      <div className="field-row">
-        <label className="field">
-          악기
-          <select
-            value={instrument}
-            onChange={e => {
-              const next = e.target.value as Instrument;
-              setInstrument(next);
-              setTuningId(next === 'bass' ? 'bassStandard' : 'standard');
-            }}
-          >
-            <option value="guitar">기타 (6현)</option>
-            <option value="bass">베이스 (4현)</option>
-          </select>
-        </label>
-        <label className="field">
-          튜닝
-          <select value={tuningId} onChange={e => setTuningId(e.target.value)}>
-            {presets.map(p => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          카포
-          <input type="number" min={0} max={12} value={capo} onChange={e => setCapo(Number(e.target.value))} />
-        </label>
-        <label className="field">
-          박자
-          <select value={timeSig} onChange={e => setTimeSig(e.target.value)}>
-            {['4/4', '3/4', '2/4', '6/8', '12/8', '5/4', '7/8'].map(t => (
-              <option key={t}>{t}</option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          템포
-          <input type="number" min={20} max={400} value={tempo} onChange={e => setTempo(Number(e.target.value))} />
-        </label>
-      </div>
-      <div className="form-actions">
-        <button type="button" className="ghost" onClick={onCancel}>
-          취소
-        </button>
-        <button type="submit" className="primary">
-          만들기
-        </button>
-      </div>
-    </form>
-  );
 }
 
 export function Library(p: Props) {
@@ -157,7 +64,7 @@ export function Library(p: Props) {
         </label>
       </div>
       {p.importError && <div className="banner error">{p.importError}</div>}
-      {creating && <NewScoreForm onCreate={p.onCreate} onCancel={() => setCreating(false)} />}
+      {creating && <NewScoreDialog onCreate={p.onCreate} onCancel={() => setCreating(false)} onImport={p.onImport} />}
       {p.loading ? (
         <p className="muted">불러오는 중…</p>
       ) : p.scores.length === 0 && !creating ? (

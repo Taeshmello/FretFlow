@@ -17,6 +17,52 @@ function run(state: EditorState, commands: (Command | [Command, number])[]): Edi
 const digit = (d: number): Command => ({ type: 'digit', digit: d });
 const fresh = (score: Score = createScore()) => createEditor(score);
 
+describe('chord symbols', () => {
+  it('stores a symbol on the selected beat and undoes consecutive typing together', () => {
+    const initial = fresh();
+    const beatId = initial.score.tracks[0].bars[0].beats[0].id;
+    const typed = run(initial, [
+      [{ type: 'setChord', beatId, chord: 'A' }, 100],
+      [{ type: 'setChord', beatId, chord: 'Am7' }, 200],
+    ]);
+    expect(cursorBeat(typed.score, typed.cursor)?.chord).toBe('Am7');
+    const undone = run(typed, [{ type: 'undo' }]);
+    expect(cursorBeat(undone.score, undone.cursor)?.chord).toBeUndefined();
+  });
+
+  it('keeps symbols on their beats when the cursor moves and allows clearing them', () => {
+    const initial = fresh();
+    const beatId = initial.score.tracks[0].bars[0].beats[0].id;
+    const edited = run(initial, [
+      { type: 'moveBeat', delta: 1 },
+      { type: 'setChord', beatId, chord: 'G/B' },
+      { type: 'setChord', beatId, chord: '' },
+    ]);
+    expect(edited.score.tracks[0].bars[0].beats[0].chord).toBeUndefined();
+    expect(cursorBeat(edited.score, edited.cursor)?.chord).toBeUndefined();
+  });
+});
+
+describe('lyrics and display-only instruments', () => {
+  it('edits lyrics on a beat and merges typing into one undo step', () => {
+    const initial = fresh();
+    const beatId = initial.score.tracks[0].bars[0].beats[0].id;
+    const typed = run(initial, [[{ type: 'setLyric', beatId, lyric: 'Hel' }, 100], [{ type: 'setLyric', beatId, lyric: 'Hello' }, 200]]);
+    expect(typed.score.tracks[0].bars[0].beats[0].lyric).toBe('Hello');
+    expect(run(typed, [{ type: 'undo' }]).score.tracks[0].bars[0].beats[0].lyric).toBeUndefined();
+  });
+
+  it('keeps piano and drums valid without pretending fret input works', () => {
+    for (const instrument of ['piano', 'drums'] as const) {
+      const initial = fresh(createScore({ instrument }));
+      expect(validateScore(initial.score)).toEqual([]);
+      expect(run(initial, [digit(4)]).score).toEqual(initial.score);
+      expect(run(initial, [{ type: 'placeFret', string: 1, fret: 4 }]).score).toEqual(initial.score);
+      expect(initial.cursor.string).toBe(1);
+    }
+  });
+});
+
 describe('fret input (SPEC §5.3)', () => {
   it('enters a digit immediately and clears the rest', () => {
     const s = run(fresh(), [digit(5)]);
@@ -294,5 +340,21 @@ describe('typing into inspector fields', () => {
     s = execute(s, { type: 'digit', digit: 3 }, 100);
     s = execute(s, { type: 'setMasterBar', prop: 'tempo', value: 110 }, 200);
     expect(s.history.undo).toHaveLength(3);
+  });
+});
+
+describe('fingering lock', () => {
+  it('unlocks and relocks the fingering of the cursor note', () => {
+    let s = run(fresh(), [digit(7)]);
+    expect(cursorNote(s.score, s.cursor)?.fingeringLocked).toBe(true);
+    s = run(s, [{ type: 'toggleFingeringLock' }]);
+    expect(cursorNote(s.score, s.cursor)?.fingeringLocked).toBe(false);
+    s = run(s, [{ type: 'undo' }]);
+    expect(cursorNote(s.score, s.cursor)?.fingeringLocked).toBe(true);
+  });
+
+  it('does nothing on an empty cell', () => {
+    const s = fresh();
+    expect(execute(s, { type: 'toggleFingeringLock' }, 0).score).toBe(s.score);
   });
 });

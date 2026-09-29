@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { installErrorReporting } from './app/telemetry';
 import './styles.css';
+import './design.css';
 
 installErrorReporting();
 

@@ -45,7 +45,7 @@ export function clampCursor(score: Score, cursor: Cursor): Cursor {
   const barIndex = Math.min(Math.max(cursor.barIndex, 0), track.bars.length - 1);
   const beats = track.bars[barIndex].beats.length;
   const beatIndex = Math.min(Math.max(cursor.beatIndex, 0), Math.max(beats - 1, 0));
-  const string = Math.min(Math.max(cursor.string, 1), track.tuning.length);
+  const string = Math.min(Math.max(cursor.string, 1), Math.max(1, track.tuning.length));
   return { trackId: track.id, barIndex, beatIndex, string };
 }
 

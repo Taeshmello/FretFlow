@@ -147,6 +147,12 @@ function convertBeat(beat: alphaTab.model.Beat, track: Track, report: Report): B
   if (beat.text) {
     out.text = beat.text;
   }
+  if (beat.lyrics?.[0]) {
+    out.lyric = beat.lyrics[0];
+  }
+  if (beat.chord?.name) {
+    out.chord = beat.chord.name;
+  }
   if (beat.graceType !== at.GraceType.None) {
     report.add('grace notes');
   }

@@ -4,6 +4,7 @@ import { beatBox, cellAt, cellBox, toAlphaTab, toAlphaTabString, type Box, type 
 import { barFill } from '@fretflow/score-model';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Audition } from '../app/store';
+import { clearPlaybackLoop } from '../player/clearPlaybackLoop';
 import type { ViewMode } from './useAlphaTab';
 
 interface Props {
@@ -20,11 +21,10 @@ interface Overlay {
   cursor: Box | null;
   selection: Box[];
   over: Box[];
-  under: Box[];
   offset: { left: number; top: number };
 }
 
-const EMPTY: Overlay = { cursor: null, selection: [], over: [], under: [], offset: { left: 0, top: 0 } };
+const EMPTY: Overlay = { cursor: null, selection: [], over: [], offset: { left: 0, top: 0 } };
 
 export function ScoreView({ api, containerRef, editor, audition, viewMode, dispatch, onConverted }: Props) {
   const convertedRef = useRef<Converted | null>(null);
@@ -39,6 +39,11 @@ export function ScoreView({ api, containerRef, editor, audition, viewMode, dispa
   useLayoutEffect(() => {
     if (!api) {
       return;
+    }
+    // Playback highlights refer to bounds of the previous score. Keeping them
+    // across renderScore can make alphaTab dereference missing realBounds.
+    if (api.playbackRange) {
+      clearPlaybackLoop(api);
     }
     const converted = toAlphaTab(score, { staffMode: viewMode }, api.settings);
     convertedRef.current = converted;
@@ -83,14 +88,13 @@ export function ScoreView({ api, containerRef, editor, audition, viewMode, dispa
     const offset = { left: s.left - w.left, top: s.top - w.top };
     const track = score.tracks.find(t => t.id === cursor.trackId) ?? score.tracks[0];
     const beat = track.bars[cursor.barIndex]?.beats[cursor.beatIndex];
-    const cursorBox = beat ? cellBox(lookup, converted, beat.id, cursor.string, track.tuning.length) : null;
+    const cursorBox = beat && track.tuning.length ? cellBox(lookup, converted, beat.id, cursor.string, track.tuning.length) : null;
     const sel = selection
       ? beatsInRange(score, selectionRange(selection))
           .map(r => beatBox(lookup, converted, r.beat.id))
           .filter((b): b is Box => b !== null)
       : [];
     const over: Box[] = [];
-    const under: Box[] = [];
     for (const t of score.tracks) {
       t.bars.forEach((bar, i) => {
         const fill = barFill(bar, score.masterBars[i]);
@@ -101,15 +105,10 @@ export function ScoreView({ api, containerRef, editor, audition, viewMode, dispa
               over.push(box);
             }
           });
-        } else if (fill.state === 'under' && bar.beats.length) {
-          const box = beatBox(lookup, converted, bar.beats[bar.beats.length - 1].id);
-          if (box) {
-            under.push({ ...box, x: box.x + box.w, w: 14 });
-          }
         }
       });
     }
-    setOverlay({ cursor: cursorBox, selection: sel, over, under, offset });
+    setOverlay({ cursor: cursorBox, selection: sel, over, offset });
   }, [api, score, cursor, selection, layoutTick, containerRef]);
 
   function handleClick(e: React.MouseEvent) {
@@ -119,7 +118,7 @@ export function ScoreView({ api, containerRef, editor, audition, viewMode, dispa
       return;
     }
     const rect = surface.getBoundingClientRect();
-    const hit = cellAt(api.boundsLookup, converted, e.clientX - rect.left, e.clientY - rect.top, ti => score.tracks[ti].tuning.length);
+    const hit = cellAt(api.boundsLookup, converted, e.clientX - rect.left, e.clientY - rect.top, ti => Math.max(1, score.tracks[ti].tuning.length));
     if (hit) {
       const trackId = score.tracks[hit.trackIndex].id;
       dispatch({ type: 'setCursor', cursor: { trackId, barIndex: hit.barIndex, beatIndex: hit.beatIndex, string: hit.string }, extend: e.shiftKey });
@@ -134,9 +133,6 @@ export function ScoreView({ api, containerRef, editor, audition, viewMode, dispa
       <div className="score-overlay" aria-hidden="true">
         {overlay.over.map((b, i) => (
           <div key={`o${i}`} className="bar-over" style={place(b)} />
-        ))}
-        {overlay.under.map((b, i) => (
-          <div key={`u${i}`} className="bar-under" style={place(b)} title="Bar is not full; the rest plays as silence" />
         ))}
         {overlay.selection.map((b, i) => (
           <div key={`s${i}`} className="selection-box" style={place(b)} />

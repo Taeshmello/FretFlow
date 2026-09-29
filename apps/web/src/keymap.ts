@@ -17,6 +17,8 @@ export type KeyResult = { command: Command } | { shell: ShellAction } | null;
 const EFFECT_KEYS: Record<string, Command> = {
   t: { type: 'tie' },
   h: { type: 'hammer' },
+  // One hammer/pull flag in the model; alphaTab prints h or p from the next pitch.
+  p: { type: 'hammer' },
   s: { type: 'slide' },
   b: { type: 'bend' },
   v: { type: 'vibrato' },
@@ -53,6 +55,9 @@ export function mapKey(e: KeyLike): KeyResult {
     }
     if (lower === 's') {
       return { shell: 'save' };
+    }
+    if (lower === 'k') {
+      return { shell: 'help' };
     }
     if (key === '3') {
       return { command: { type: 'tuplet' } };

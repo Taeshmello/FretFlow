@@ -22,7 +22,7 @@ export const exportAsGp = (score: Score) => download(exportGp7(score), `${safeNa
 
 export interface PrintOptions {
   paper: 'a4' | 'letter';
-  staves: 'scoreTab' | 'tab';
+  staves: 'scoreTab' | 'tab' | 'score';
   /** 1-based inclusive bar range; null = whole score. */
   range: [number, number] | null;
 }
@@ -41,12 +41,15 @@ export function printScore(api: alphaTab.AlphaTabApi, opts: PrintOptions): void 
   score.copyright = 'Made with FretFlow';
   api.print(opts.paper === 'a4' ? '210mm' : '8.5in', {
     display: {
-      staveProfile: opts.staves === 'tab' ? alphaTab.StaveProfile.Tab : alphaTab.StaveProfile.ScoreTab,
+      staveProfile: opts.staves === 'tab' ? alphaTab.StaveProfile.Tab : opts.staves === 'score' ? alphaTab.StaveProfile.Score : alphaTab.StaveProfile.ScoreTab,
       ...(opts.range ? { startBar: opts.range[0], barCount: opts.range[1] - opts.range[0] + 1 } : {}),
     },
     notation: {
       elements: new Map([
         [alphaTab.NotationElement.ScoreCopyright, true],
+        [alphaTab.NotationElement.ScoreTitle, true],
+        [alphaTab.NotationElement.ScoreArtist, true],
+        [alphaTab.NotationElement.GuitarTuning, true],
         [alphaTab.NotationElement.EffectDynamics, false],
       ]),
     },

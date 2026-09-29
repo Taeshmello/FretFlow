@@ -55,6 +55,39 @@ describe('string numbering (D-014)', () => {
 });
 
 describe('toAlphaTab', () => {
+  it('renders a lyric and a standard-only guitar staff', () => {
+    const src = createScore();
+    src.tracks[0].bars[0].beats[0].lyric = 'Hello';
+    const { score } = toAlphaTab(src, { staffMode: 'score' }, new alphaTab.Settings());
+    const staff = score.tracks[0].staves[0];
+    expect(staff.showStandardNotation).toBe(true);
+    expect(staff.showTablature).toBe(false);
+    expect(staff.bars[0].voices[0].beats[0].lyrics).toEqual(['Hello']);
+    expect(fromAlphaTab(score).score.tracks[0].bars[0].beats[0].lyric).toBe('Hello');
+    expect(importFile(exportGp7(src)).score.tracks[0].bars[0].beats[0].lyric).toBe('Hello');
+  });
+
+  it('creates standard-only piano and percussion staves', () => {
+    for (const instrument of ['piano', 'drums'] as const) {
+      const src = createScore({ instrument });
+      expect(validateScore(src)).toEqual([]);
+      const { score } = toAlphaTab(src, { staffMode: 'tab' }, new alphaTab.Settings());
+      const staff = score.tracks[0].staves[0];
+      expect(staff.showStandardNotation).toBe(true);
+      expect(staff.showTablature).toBe(false);
+      expect(staff.isPercussion).toBe(instrument === 'drums');
+    }
+  });
+  it('renders a chord name above the staff without a chord diagram', () => {
+    const src = createScore();
+    src.tracks[0].bars[0].beats[0].chord = 'Am7';
+    const { score } = toAlphaTab(src, { staffMode: 'scoreTab' }, new alphaTab.Settings());
+    const beat = score.tracks[0].staves[0].bars[0].voices[0].beats[0];
+    expect(beat.chord?.name).toBe('Am7');
+    expect(beat.chord?.showName).toBe(true);
+    expect(beat.chord?.showDiagram).toBe(false);
+  });
+
   it('puts our string 6 (low E) on alphaTab string 1', () => {
     const { score } = toAlphaTab(riff(), { staffMode: 'scoreTab' }, new alphaTab.Settings());
     const low = score.tracks[0].staves[0].bars[0].voices[0].beats[0].notes.find(n => n.fret === 0);
@@ -80,6 +113,14 @@ describe('toAlphaTab', () => {
 });
 
 describe('round trip through alphaTab', () => {
+  it('preserves chord symbols on import and Guitar Pro export', () => {
+    const src = createScore();
+    src.tracks[0].bars[0].beats[0].chord = 'G/B';
+    const { score: converted } = toAlphaTab(src, { staffMode: 'scoreTab' }, new alphaTab.Settings());
+    expect(fromAlphaTab(converted).score.tracks[0].bars[0].beats[0].chord).toBe('G/B');
+    expect(importFile(exportGp7(src)).score.tracks[0].bars[0].beats[0].chord).toBe('G/B');
+  });
+
   it('keeps the music when converting to alphaTab and back', () => {
     const src = riff();
     const { score: model } = toAlphaTab(src, { staffMode: 'scoreTab' }, new alphaTab.Settings());

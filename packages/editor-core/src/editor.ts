@@ -1,5 +1,5 @@
-import { applyOps, invert, newId, setOp, type Duration, type Op, type Instrument, type NoteEffects, type Score } from '@fretflow/score-model';
-import { clampCursor, initialCursor, moveBar, moveString, type Cursor, type Selection } from './cursor';
+import { applyOps, findBeat, invert, newId, setOp, type Duration, type Id, type Op, type Instrument, type NoteEffects, type Score } from '@fretflow/score-model';
+import { clampCursor, cursorNote, initialCursor, moveBar, moveString, type Cursor, type Selection } from './cursor';
 import { DEFAULT_SETTINGS, type Change, type Settings } from './change';
 import { emptyHistory, popRedo, popUndo, record, type History } from './history';
 import * as bars from './commands/bars';
@@ -41,6 +41,10 @@ function fieldKey(command: Command, cursor: Cursor): string | null {
       return `track:${cursor.trackId}:name`;
     case 'setCapo':
       return `track:${cursor.trackId}:capo`;
+    case 'setChord':
+      return `beat:${command.beatId}:chord`;
+    case 'setLyric':
+      return `beat:${command.beatId}:lyric`;
     default:
       return null;
   }
@@ -81,6 +85,7 @@ export type Command =
   | { type: 'deleteNote' }
   | { type: 'deleteBeat' }
   | { type: 'tie' }
+  | { type: 'toggleFingeringLock' }
   | { type: 'hammer' }
   | { type: 'slide' }
   | { type: 'bend' }
@@ -99,6 +104,8 @@ export type Command =
   | { type: 'setCapo'; capo: number }
   | { type: 'renameTrack'; name: string }
   | { type: 'setTitle'; title: string; artist?: string }
+  | { type: 'setChord'; beatId: Id; chord: string }
+  | { type: 'setLyric'; beatId: Id; lyric: string }
   | { type: 'addTrack'; instrument: Instrument; tuning?: number[] }
   | { type: 'removeTrack' }
   | { type: 'copy' }
@@ -148,6 +155,11 @@ function run(state: EditorState, command: Command, now: number, mergeField: bool
     commitChange(s, change && mergeField ? { ...change, merge: true } : change, at);
   const { score, cursor, selection } = base;
   const trackId = cursor.trackId;
+  const activeTrack = score.tracks.find(t => t.id === trackId) ?? score.tracks[0];
+  if ((activeTrack.instrument === 'piano' || activeTrack.instrument === 'drums')
+    && (command.type === 'digit' || command.type === 'placeFret')) {
+    return { ...base, notice: '이 악기는 현재 악보 표시만 지원합니다. 전용 음표 입력은 준비 중입니다.' };
+  }
 
   switch (command.type) {
     case 'digit': {
@@ -207,6 +219,10 @@ function run(state: EditorState, command: Command, now: number, mergeField: bool
       return commit(base, rhythm.deleteBeats(score, cursor, selection), now);
     case 'tie':
       return commit(base, fx.toggleTie(score, cursor), now);
+    case 'toggleFingeringLock': {
+      const note = cursorNote(score, cursor);
+      return note ? commit(base, { ops: [setOp(score, note.id, ['fingeringLocked'], !note.fingeringLocked)], label: 'fingering lock' }, now) : base;
+    }
     case 'hammer':
       return commit(base, fx.toggleHammer(score, cursor, selection), now);
     case 'slide':
@@ -247,6 +263,24 @@ function run(state: EditorState, command: Command, now: number, mergeField: bool
         ops.push(setOp(score, score.id, ['meta', 'artist'], command.artist || undefined));
       }
       return commit(base, { ops, label: 'title' }, now);
+    }
+    case 'setChord': {
+      const beat = findBeat(score, command.beatId);
+      if (!beat) {
+        return base;
+      }
+      const chord = command.chord.trim().slice(0, 32) || undefined;
+      if (beat.chord === chord) {
+        return base;
+      }
+      return commit(base, { ops: [setOp(score, beat.id, ['chord'], chord)], label: 'chord symbol' }, now);
+    }
+    case 'setLyric': {
+      const beat = findBeat(score, command.beatId);
+      if (!beat) return base;
+      const lyric = command.lyric.slice(0, 160) || undefined;
+      if (beat.lyric === lyric) return base;
+      return commit(base, { ops: [setOp(score, beat.id, ['lyric'], lyric)], label: 'lyric' }, now);
     }
     case 'addTrack':
       return commit(base, tracks.addTrack(score, cursor, command.instrument, command.tuning), now);
