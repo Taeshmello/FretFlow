@@ -1,0 +1,17 @@
+{
+  "name": "fretflow",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.6.0",
+  "scripts": {
+    "dev": "pnpm --filter @fretflow/web dev",
+    "build": "pnpm --filter @fretflow/web build",
+    "test": "vitest run",
+    "typecheck": "pnpm -r --parallel typecheck",
+    "lint": "node -e \"console.error('lint unavailable: typescript-eslint 8.71 supports TypeScript <6.1, this repo pins 7.0.2 (see docs/PROGRESS.md)'); process.exit(1)\""
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "vitest": "5.0.2"
+  }
+}

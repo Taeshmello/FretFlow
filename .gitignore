@@ -35,3 +35,7 @@ ios/App/build/
 # 문서 (추적하지 않음)
 docs/
 *.md
+
+# alphaTab Vite 플러그인이 복사하는 폰트·사운드폰트
+apps/web/public/font/
+apps/web/public/soundfont/
