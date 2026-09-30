@@ -69,6 +69,7 @@ export function TouchInput({ editor, dispatch, octave, onOctave }: Props) {
         <div className="touch-strip" role="group" aria-label="Beat">
           <button type="button" aria-pressed={!!beat?.rest} onClick={() => dispatch({ type: 'rest' })}>Rest</button>
           {track.instrument === 'piano' && <button type="button" onClick={() => dispatch({ type: 'tie' })}>Tie</button>}
+          {track.instrument === 'piano' && <button type="button" aria-pressed={beat?.pedal !== undefined} onClick={() => dispatch({ type: 'pedal' })}>{beat?.pedal === 'up' ? 'Ped. up' : 'Ped.'}</button>}
           <button type="button" onClick={() => dispatch({ type: 'insertBeat' })}>+ Beat</button>
           <button type="button" onClick={() => dispatch({ type: 'deleteNote' })}>Clear</button>
         </div>
