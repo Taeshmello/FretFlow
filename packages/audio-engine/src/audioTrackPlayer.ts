@@ -14,17 +14,26 @@ import type { LoadedAudio } from './decodeAudio';
  * 50%, a WASM engine can replace the element behind this same class API.
  */
 
+/** Default slowest rate (free plan). */
 export const MIN_RATE = 0.5;
-/** Hard ceiling of the API; the per-player `maxRate` option (default 1.0) sits below it. */
+/** Hard floor and ceiling of the API; the per-player range (default 0.5–1.0) sits inside them. */
+export const RATE_FLOOR = 0.25;
 export const RATE_CEILING = 1.5;
+
+/** `value` inside `range`, which itself never leaves [RATE_FLOOR, RATE_CEILING]. */
+export function clampRate(value: number, [min, max]: readonly [number, number]): number {
+  const lo = Math.max(RATE_FLOOR, min);
+  const hi = Math.min(RATE_CEILING, max);
+  return Math.min(hi, Math.max(lo, value));
+}
 
 export type PlayerState = 'empty' | 'loading' | 'paused' | 'playing';
 
 export interface AudioTrackPlayerOptions {
   /** Where the player's gain goes, e.g. `Crossfader.input`. Defaults to the destination. */
   destination?: AudioNode;
-  /** Upper playback rate, clamped to [MIN_RATE, RATE_CEILING]. Default 1.0 (Pro raises it). */
-  maxRate?: number;
+  /** Allowed playback rates. Default [MIN_RATE, 1] (the free plan); Pro widens it with setRateRange. */
+  rateRange?: [number, number];
   /** Fade length on each side of a loop jump. */
   crossfadeMs?: number;
 }
@@ -36,7 +45,7 @@ const FRAME_SECONDS = 0.02;
 
 export class AudioTrackPlayer {
   private readonly gain: GainNode;
-  private readonly maxRate: number;
+  private rateRange: [number, number];
   private readonly fadeSeconds: number;
   private element: HTMLAudioElement | null = null;
   private source: MediaElementAudioSourceNode | null = null;
@@ -57,7 +66,7 @@ export class AudioTrackPlayer {
   ) {
     this.gain = context.createGain();
     this.gain.connect(options.destination ?? context.destination);
-    this.maxRate = Math.min(RATE_CEILING, Math.max(MIN_RATE, options.maxRate ?? 1));
+    this.rateRange = options.rateRange ?? [MIN_RATE, 1];
     this.fadeSeconds = (options.crossfadeMs ?? 10) / 1000;
   }
 
@@ -78,12 +87,18 @@ export class AudioTrackPlayer {
     return this.playbackRate;
   }
 
-  /** Clamped to [MIN_RATE, maxRate]. Pitch is preserved. */
+  /** Clamped to the rate range. Pitch is preserved. */
   set rate(value: number) {
-    this.playbackRate = Math.min(this.maxRate, Math.max(MIN_RATE, value));
+    this.playbackRate = clampRate(value, this.rateRange);
     if (this.element) {
       this.element.playbackRate = this.playbackRate;
     }
+  }
+
+  /** Changes the allowed rates (plan change); the current rate is pulled inside. */
+  setRateRange(range: [number, number]): void {
+    this.rateRange = range;
+    this.rate = this.playbackRate;
   }
 
   get volume(): number {
