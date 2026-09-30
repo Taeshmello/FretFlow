@@ -15,7 +15,20 @@ async function api(path: string, init: RequestInit = {}): Promise<Response> {
   });
 }
 
-/** Login (magic link / Google via Better Auth on services/api). Hidden in local-only mode. */
+type Provider = 'google' | 'apple';
+
+const PROVIDERS: { id: Provider; label: string }[] = [
+  { id: 'google', label: 'Continue with Google' },
+  { id: 'apple', label: 'Continue with Apple' },
+];
+
+/**
+ * Social providers that are switched on, e.g. VITE_SOCIAL_LOGIN=google,apple. The buttons
+ * always show; until the provider's keys are set up on the server they stay disabled.
+ */
+const ENABLED = new Set(((import.meta.env.VITE_SOCIAL_LOGIN as string | undefined) ?? '').split(',').map(x => x.trim()));
+
+/** Login (email link now; Google and Apple via Better Auth once configured). Hidden in local-only mode. */
 export function Account({ onSignedIn }: { onSignedIn: () => void }) {
   const [me, setMe] = useState<Me | null>(null);
   const [open, setOpen] = useState(false);
@@ -92,29 +105,43 @@ export function Account({ onSignedIn }: { onSignedIn: () => void }) {
             }
           }}
         >
-          <input type="email" required placeholder="email@example.com" value={email} onChange={e => setEmail(e.target.value)} />
-          <button type="submit" className="primary small">
-            Email me a link
-          </button>
-          <button
-            type="button"
-            className="ghost small"
-            onClick={async () => {
-              // Better Auth: POST {provider, callbackURL} → { url } of the Google consent page.
-              const r = await api('/api/auth/sign-in/social', {
-                method: 'POST',
-                body: JSON.stringify({ provider: 'google', callbackURL: window.location.origin }),
-              }).catch(() => null);
-              const body = r?.ok ? ((await r.json()) as { url?: string }) : null;
-              if (body?.url) {
-                window.location.assign(body.url);
-              } else {
-                setError('Could not start Google sign-in.');
-              }
-            }}
-          >
-            Google
-          </button>
+          <div className="login-social">
+            {PROVIDERS.map(({ id, label }) => {
+              const enabled = ENABLED.has(id);
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  className={`btn social ${id}`}
+                  disabled={!enabled}
+                  title={enabled ? undefined : 'Coming soon — use email for now'}
+                  onClick={async () => {
+                    // Better Auth: POST {provider, callbackURL} → { url } of the provider's consent page.
+                    const r = await api('/api/auth/sign-in/social', {
+                      method: 'POST',
+                      body: JSON.stringify({ provider: id, callbackURL: window.location.origin }),
+                    }).catch(() => null);
+                    const body = r?.ok ? ((await r.json()) as { url?: string }) : null;
+                    if (body?.url) {
+                      window.location.assign(body.url);
+                    } else {
+                      setError(`Could not start ${id === 'google' ? 'Google' : 'Apple'} sign-in.`);
+                    }
+                  }}
+                >
+                  {label}
+                  {!enabled && <small>Soon</small>}
+                </button>
+              );
+            })}
+          </div>
+          <span className="login-or muted small">or sign in with email</span>
+          <div className="login-email">
+            <input type="email" required aria-label="Email" placeholder="email@example.com" value={email} onChange={e => setEmail(e.target.value)} />
+            <button type="submit" className="btn primary small">
+              Email me a link
+            </button>
+          </div>
           {error && <span className="error-text">{error}</span>}
         </form>
       )}
