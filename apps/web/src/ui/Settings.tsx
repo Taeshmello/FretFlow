@@ -8,6 +8,8 @@ interface Props {
 
 const KEY_NAMES = ['C♭', 'G♭', 'D♭', 'A♭', 'E♭', 'B♭', 'F', 'C', 'G', 'D', 'A', 'E', 'B', 'F♯', 'C♯'];
 const TIME_SIGS = ['2/4', '3/4', '4/4', '5/4', '6/4', '7/4', '3/8', '6/8', '7/8', '9/8', '12/8'];
+/** Bar width relative to its natural width (MasterBar.width). */
+const WIDTHS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 
 /** Time signature, key, tempo, section and repeats of the cursor bar, plus bar editing. */
 export function BarSettings({ editor, dispatch }: Props) {
@@ -31,6 +33,20 @@ export function BarSettings({ editor, dispatch }: Props) {
             {KEY_NAMES.map((k, i) => (
               <option key={k} value={i - 7}>
                 {k}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          Width
+          <select
+            title="How wide this bar is drawn, compared with its natural width"
+            value={mb.width ?? 1}
+            onChange={e => dispatch({ type: 'setMasterBar', prop: 'width', value: Number(e.target.value) })}
+          >
+            {WIDTHS.map(w => (
+              <option key={w} value={w}>
+                {w * 100}%
               </option>
             ))}
           </select>

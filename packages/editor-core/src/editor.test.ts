@@ -235,6 +235,15 @@ describe('bars', () => {
     expect(execute(s, { type: 'setMasterBar', prop: 'timeSig', value: [4, 3] }, 0).score).toBe(s.score);
     expect(execute(s, { type: 'setMasterBar', prop: 'timeSig', value: [6, 8] }, 0).score.masterBars[0].timeSig).toEqual([6, 8]);
   });
+
+  it('sets a bar width, stores natural width as no value and rejects widths out of range', () => {
+    let s = execute(fresh(), { type: 'setMasterBar', prop: 'width', value: 2 }, 0);
+    expect(s.score.masterBars[0].width).toBe(2);
+    expect(validateScore(s.score)).toEqual([]);
+    s = execute(s, { type: 'setMasterBar', prop: 'width', value: 1 }, 5000);
+    expect('width' in s.score.masterBars[0]).toBe(false);
+    expect(execute(s, { type: 'setMasterBar', prop: 'width', value: 9 }, 9000).score).toBe(s.score);
+  });
 });
 
 describe('tracks', () => {

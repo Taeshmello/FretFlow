@@ -1,5 +1,9 @@
 import { DRUM_PIECES, isFretted, PIANO_HIGH, PIANO_LOW } from './instruments';
 import { DURATION_BASES } from './time';
+
+/** Allowed range of MasterBar.width. */
+export const BAR_WIDTH_MIN = 0.5;
+export const BAR_WIDTH_MAX = 4;
 import type { Score } from './types';
 
 export interface ValidationIssue {
@@ -22,6 +26,7 @@ export interface ValidationIssue {
     | 'duration'
     | 'timeSig'
     | 'keySig'
+    | 'barWidth'
     | 'tuning';
   message: string;
   id?: string;
@@ -51,6 +56,9 @@ export function validateScore(score: Score): ValidationIssue[] {
     }
     if (!Number.isInteger(mb.keySig) || mb.keySig < -7 || mb.keySig > 7) {
       issues.push({ code: 'keySig', message: `key signature ${mb.keySig} out of -7..7`, id: mb.id });
+    }
+    if (mb.width !== undefined && !(typeof mb.width === 'number' && mb.width >= BAR_WIDTH_MIN && mb.width <= BAR_WIDTH_MAX)) {
+      issues.push({ code: 'barWidth', message: `bar width ${String(mb.width)} out of ${BAR_WIDTH_MIN}..${BAR_WIDTH_MAX}`, id: mb.id });
     }
   }
 

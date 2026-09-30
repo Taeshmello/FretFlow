@@ -24,6 +24,8 @@ export interface MasterBar {
   /** Number of plays when this bar closes a repeat. */
   repeatEnd?: number;
   section?: string;
+  /** Display width relative to the bar's natural width (1 = natural). Layout only. */
+  width?: number;
 }
 
 export type Instrument = 'guitar' | 'bass' | 'piano' | 'drums';

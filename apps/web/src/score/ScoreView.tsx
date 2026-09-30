@@ -1,6 +1,6 @@
 import * as alphaTab from '@coderline/alphatab';
 import { beatsInRange, selectionRange, type Command, type EditorState } from '@fretflow/editor-core';
-import { beatBox, cellAt, cellBox, pedalChanges, sustainNoteOffs, toAlphaTab, type Box, type Converted } from '@fretflow/render';
+import { beatBox, cellAt, cellBox, hasCustomWidths, pedalChanges, sustainNoteOffs, toAlphaTab, type Box, type Converted } from '@fretflow/render';
 import { barFill } from '@fretflow/score-model';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Audition } from '../app/store';
@@ -35,6 +35,22 @@ export function ScoreView({ api, containerRef, editor, audition, viewMode, dispa
   const lastAudition = useRef(0);
   const { score, cursor, selection } = editor;
 
+  // Custom bar widths need the line width to break lines (layout.ts); plain scores
+  // leave it to alphaTab and do not re-convert on resize.
+  const [surfaceWidth, setSurfaceWidth] = useState(0);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) {
+      return;
+    }
+    const measure = () => setSurfaceWidth(Math.round(el.clientWidth / 10) * 10);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [containerRef]);
+  const layoutWidth = hasCustomWidths(score) ? surfaceWidth : 0;
+
   // Re-convert and re-render on every document change (D-015: full render, ~20–30ms for 200 bars).
   // A layout effect, so the render starts before the browser paints instead of one frame later.
   useLayoutEffect(() => {
@@ -48,7 +64,14 @@ export function ScoreView({ api, containerRef, editor, audition, viewMode, dispa
     }
     // renderScore reloads the MIDI and stops playback; carry on from the same tick.
     const resumeTick = api.playerState === alphaTab.synth.PlayerState.Playing ? api.tickPosition : null;
-    const converted = toAlphaTab(score, { staffMode: viewMode }, api.settings);
+    // alphaTab's own page padding sits on both sides of the lines.
+    const [padX] = api.settings.display.padding.length ? api.settings.display.padding : [0];
+    const converted = toAlphaTab(score, { staffMode: viewMode, layoutWidth: Math.max(0, layoutWidth - 2 * padX) }, api.settings);
+    const mode = converted.modelLayout ? alphaTab.SystemsLayoutMode.UseModelLayout : alphaTab.SystemsLayoutMode.Automatic;
+    if (api.settings.display.systemsLayoutMode !== mode) {
+      api.settings.display.systemsLayoutMode = mode;
+      api.updateSettings();
+    }
     convertedRef.current = converted;
     onConverted(converted);
     api.renderScore(converted.score, score.tracks.map((_, i) => i));
@@ -79,7 +102,7 @@ export function ScoreView({ api, containerRef, editor, audition, viewMode, dispa
         }
       }, 2000);
     }
-  }, [api, score, viewMode, onConverted]);
+  }, [api, score, viewMode, onConverted, layoutWidth]);
 
   useEffect(() => {
     if (!api) {

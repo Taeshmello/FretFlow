@@ -1,4 +1,6 @@
 import {
+  BAR_WIDTH_MAX,
+  BAR_WIDTH_MIN,
   cloneBeat,
   createBar,
   createMasterBar,
@@ -81,7 +83,7 @@ export function cycleRepeatEnd(score: Score, cursor: Cursor): Change {
   return { ops: [setOp(score, mb.id, ['repeatEnd'], next)], label: 'repeat end' };
 }
 
-export type MasterBarProp = 'timeSig' | 'keySig' | 'tempo' | 'section';
+export type MasterBarProp = 'timeSig' | 'keySig' | 'tempo' | 'section' | 'width';
 
 export function setMasterBarProp(score: Score, barIndex: number, prop: MasterBarProp, value: unknown): Change | null {
   const mb = score.masterBars[barIndex];
@@ -102,6 +104,13 @@ export function setMasterBarProp(score: Score, barIndex: number, prop: MasterBar
   }
   if (prop === 'tempo' && value !== undefined && (typeof value !== 'number' || value < 20 || value > 400)) {
     return null;
+  }
+  if (prop === 'width') {
+    if (value !== undefined && (typeof value !== 'number' || value < BAR_WIDTH_MIN || value > BAR_WIDTH_MAX)) {
+      return null;
+    }
+    // Natural width is the default, so it is stored as no value.
+    value = value === 1 ? undefined : value;
   }
   return { ops: [setOp(score, mb.id, [prop], value === '' ? undefined : value)], label: `set ${prop}` };
 }

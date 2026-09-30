@@ -1,5 +1,7 @@
 import * as alphaTab from '@coderline/alphatab';
-import { DRUM_ORDER, DRUM_PIECES, isFretted, type Beat, type DrumHit, type DrumPiece, type Id, type MasterBar, type Note, type NoteEffects, type Score, type Track } from '@fretflow/score-model';
+import { isFretted, type Beat, type Id, type MasterBar, type Note, type NoteEffects, type Score, type Track } from '@fretflow/score-model';
+import { drumArticulations, drumNote } from './drumKit';
+import { applyModelLayout, barWeights, hasCustomWidths } from './layout';
 import { addPedalMarkers, type PedalMarkers } from './pedal';
 import { toAlphaTabString } from './strings';
 
@@ -9,6 +11,8 @@ export type StaffMode = 'scoreTab' | 'tab' | 'score';
 
 export interface ConvertOptions {
   staffMode: StaffMode;
+  /** Width in px the score is laid out in. Needed for custom bar widths (see layout.ts). */
+  layoutWidth?: number;
 }
 
 /** Where one of our beats lives, in our indexes. */
@@ -25,6 +29,8 @@ export interface Converted {
   beats: Map<Id, alphaTab.model.Beat>;
   /** alphaTab beat → our position. */
   refs: Map<alphaTab.model.Beat, BeatRef>;
+  /** Lines and bar sizes come from us: render with SystemsLayoutMode.UseModelLayout. */
+  modelLayout: boolean;
 }
 
 /** General MIDI programs: steel guitar, clean electric, finger bass. */
@@ -135,47 +141,6 @@ function keyNote(pitch: number, tied: boolean): alphaTab.model.Note {
   return n;
 }
 
-const F = at.MusicFontSymbol;
-/** Staff line and note heads per piece, as in alphaTab's GP7 default drum kit. */
-const DRUM_LOOK: Record<DrumPiece, [name: string, line: number, head: alphaTab.model.MusicFontSymbol, half: alphaTab.model.MusicFontSymbol, whole: alphaTab.model.MusicFontSymbol]> = {
-  kick: ['Kick Drum', 7, F.NoteheadBlack, F.NoteheadHalf, F.NoteheadWhole],
-  snare: ['Snare', 3, F.NoteheadBlack, F.NoteheadHalf, F.NoteheadWhole],
-  hihatClosed: ['Charley', -1, F.NoteheadXBlack, F.NoteheadXBlack, F.NoteheadXBlack],
-  hihatOpen: ['Charley', -1, F.NoteheadCircleX, F.NoteheadCircleX, F.NoteheadCircleX],
-  crash: ['Crash High', -2, F.NoteheadHeavyX, F.NoteheadHeavyX, F.NoteheadHeavyX],
-  ride: ['Ride', 0, F.NoteheadXBlack, F.NoteheadXBlack, F.NoteheadXBlack],
-  tomHigh: ['Tom High', 2, F.NoteheadBlack, F.NoteheadHalf, F.NoteheadWhole],
-  tomMid: ['Tom Medium', 4, F.NoteheadBlack, F.NoteheadHalf, F.NoteheadWhole],
-  tomFloor: ['Very Low Floor Tom', 5, F.NoteheadBlack, F.NoteheadHalf, F.NoteheadWhole],
-  sideStick: ['Snare', 3, F.NoteheadXBlack, F.NoteheadXBlack, F.NoteheadXBlack],
-  tomLow: ['Tom Low', 5, F.NoteheadBlack, F.NoteheadHalf, F.NoteheadWhole],
-  hihatPedal: ['Charley', 9, F.NoteheadXBlack, F.NoteheadXBlack, F.NoteheadXBlack],
-};
-
-/**
- * The track's own articulation list, one entry per kit piece in DRUM_ORDER. A note's
- * percussionArticulation is an index into this list: that is how Guitar Pro files
- * store drums, so export, import, playback and rendering agree.
- */
-function drumArticulations(): alphaTab.model.InstrumentArticulation[] {
-  return DRUM_ORDER.map(piece => {
-    const [name, line, head, half, whole] = DRUM_LOOK[piece];
-    const midi = DRUM_PIECES[piece].midi;
-    return new at.InstrumentArticulation(name, line, midi, head, half, whole, F.None, undefined, midi);
-  });
-}
-
-function drumNote(piece: DrumPiece, dynamic: DrumHit['dynamic']): alphaTab.model.Note {
-  const n = new at.Note();
-  n.percussionArticulation = DRUM_ORDER.indexOf(piece);
-  if (dynamic === 'accent') {
-    n.accentuated = at.AccentuationType.Normal;
-  } else if (dynamic === 'ghost') {
-    n.isGhost = true;
-  }
-  return n;
-}
-
 function chordFor(staff: alphaTab.model.Staff, beat: Beat, converted: alphaTab.model.Beat, stringCount: number): void {
   if (!beat.chord) {
     return;
@@ -280,7 +245,7 @@ function convertTrack(
 
 /** Builds a fresh alphaTab score. Cheap enough to do on every edit (D-004: 1–5ms for 200 bars). */
 export function toAlphaTab(score: Score, options: ConvertOptions, settings: alphaTab.Settings): Converted {
-  const out: Converted = { score: new at.Score(), beats: new Map(), refs: new Map() };
+  const out: Converted = { score: new at.Score(), beats: new Map(), refs: new Map(), modelLayout: false };
   const s = out.score;
   s.title = score.meta.title;
   s.artist = score.meta.artist ?? '';
@@ -289,6 +254,10 @@ export function toAlphaTab(score: Score, options: ConvertOptions, settings: alph
   }
   const pedals: PedalMarkers = [];
   score.tracks.forEach((track, i) => s.addTrack(convertTrack(track, i, score, options, out, pedals)));
+  if (options.layoutWidth && hasCustomWidths(score)) {
+    applyModelLayout(s, barWeights(score), options.layoutWidth);
+    out.modelLayout = true;
+  }
   s.finish(settings);
   // Bar.finish turns every Down in a bar that the pedal enters held into a Hold,
   // which would drop a re-pedal (Up then Down) from the drawing and the GP export.

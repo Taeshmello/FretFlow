@@ -1,5 +1,5 @@
 import * as alphaTab from '@coderline/alphatab';
-import { exportGp7, exportMidi, importFile, type ImportResult } from '@fretflow/render';
+import { exportGp7, exportMidi, importFile, relayoutForWidth, type ImportResult } from '@fretflow/render';
 import { cloneWithNewIds, migrateScore, validateScore, type Score } from '@fretflow/score-model';
 
 export function download(bytes: Uint8Array | string, name: string, type: string): void {
@@ -39,6 +39,10 @@ export function printScore(api: alphaTab.AlphaTabApi, opts: PrintOptions): void 
     return;
   }
   score.copyright = 'Made with FretFlow';
+  // Custom bar widths break lines for the screen; re-break them for the page (96 px per inch).
+  const pagePx = opts.paper === 'a4' ? 794 : 816;
+  const [padX] = api.settings.display.padding.length ? api.settings.display.padding : [0];
+  relayoutForWidth(score, pagePx - 2 * padX, opts.range ? opts.range[0] - 1 : 0, opts.range ? opts.range[1] - opts.range[0] + 1 : undefined);
   api.print(opts.paper === 'a4' ? '210mm' : '8.5in', {
     display: {
       staveProfile: opts.staves === 'tab' ? alphaTab.StaveProfile.Tab : opts.staves === 'score' ? alphaTab.StaveProfile.Score : alphaTab.StaveProfile.ScoreTab,
