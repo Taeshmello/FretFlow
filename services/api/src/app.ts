@@ -26,6 +26,10 @@ export interface RateLimits {
   signIn: RateLimiter;
   /** Magic links sent, per email address (anti email-bombing). */
   signInEmail: RateLimiter;
+  /** POST /api/auth/sign-up/*, per client IP (account creation). */
+  signUp: RateLimiter;
+  /** Failed password sign-ins, per email address (guessing across IPs; successes do not count, so a victim is not locked out by their own logins). */
+  passwordEmail: RateLimiter;
   /** POST /api/audio/upload-url, per user. */
   audioUpload: RateLimiter;
 }
@@ -35,6 +39,8 @@ export function defaultRateLimits(): RateLimits {
     perUser: createMemoryRateLimiter({ max: 300, windowMs: 60_000 }),
     signIn: createMemoryRateLimiter({ max: 5, windowMs: 60_000 }),
     signInEmail: createMemoryRateLimiter({ max: 3, windowMs: 10 * 60_000 }),
+    signUp: createMemoryRateLimiter({ max: 5, windowMs: 10 * 60_000 }),
+    passwordEmail: createMemoryRateLimiter({ max: 10, windowMs: 10 * 60_000 }),
     audioUpload: createMemoryRateLimiter({ max: 30, windowMs: 60_000 }),
   };
 }
@@ -69,8 +75,8 @@ function clientIp(c: Context, header: string | undefined): string {
   }
 }
 
-/** Normalized address from a magic-link request, read from a clone so Better Auth still gets the body. */
-async function magicLinkEmail(req: Request): Promise<string | null> {
+/** Normalized address from a sign-in request body, read from a clone so Better Auth still gets the body. */
+async function requestEmail(req: Request): Promise<string | null> {
   try {
     const body = (await req.clone().json()) as { email?: unknown };
     return typeof body.email === 'string' ? body.email.trim().toLowerCase() : null;
@@ -128,10 +134,30 @@ export function createApp(deps: AppDeps) {
     await next();
   });
   app.post('/api/auth/sign-in/magic-link', async (c, next) => {
-    const email = await magicLinkEmail(c.req.raw);
+    const email = await requestEmail(c.req.raw);
     if (email) {
       enforceLimit(c, limits.signInEmail, `email:${email}`);
     }
+    await next();
+  });
+  app.post('/api/auth/sign-in/email', async (c, next) => {
+    const email = await requestEmail(c.req.raw);
+    const key = email ? `password:${email}` : null;
+    if (key) {
+      const { allowed, retryAfterSec } = limits.passwordEmail.peek(key);
+      if (!allowed) {
+        c.header('Retry-After', String(retryAfterSec));
+        throw new HttpError(429, 'rate_limited', 'Too many requests');
+      }
+    }
+    await next();
+    // Only wrong passwords count against the address.
+    if (key && c.res.status === 401) {
+      limits.passwordEmail.hit(key);
+    }
+  });
+  app.post('/api/auth/sign-up/*', async (c, next) => {
+    enforceLimit(c, limits.signUp, `ip:${clientIp(c, deps.clientIpHeader)}`);
     await next();
   });
   app.on(['GET', 'POST'], '/api/auth/*', c => auth.handler(c.req.raw));
@@ -140,7 +166,7 @@ export function createApp(deps: AppDeps) {
   const guard = requireUser(auth, limits.perUser);
   app.use('/api/*', async (c, next) => (isPublicPath(c.req.path) ? next() : guard(c, next)));
 
-  app.route('/api/me', meRoutes());
+  app.route('/api/me', meRoutes(db));
   app.route('/api/scores', scoreRoutes(db));
   app.route('/api/scores', syncMapRoutes(db));
   app.route('/api/audio', audioRoutes(db, deps.storage, limits.audioUpload, audioLimits));

@@ -1,0 +1,2 @@
+ALTER TABLE "entitlements" ADD CONSTRAINT "entitlements_plan_check" CHECK ("entitlements"."plan" in ('pro'));--> statement-breakpoint
+ALTER TABLE "entitlements" ADD CONSTRAINT "entitlements_source_check" CHECK ("entitlements"."source" in ('manual', 'mor'));

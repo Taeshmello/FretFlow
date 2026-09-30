@@ -1,4 +1,5 @@
-import { bigint, boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { bigint, boolean, check, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique } from 'drizzle-orm/pg-core';
 
 // Better Auth core tables (user, session, account, verification). Field keys
 // must match Better Auth's model field names; the drizzle adapter maps by key.
@@ -118,4 +119,24 @@ export const syncMaps = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   t => [primaryKey({ columns: [t.scoreId, t.audioId] })],
+);
+
+/**
+ * What a user has paid for (D-010: the server decides). One row per user while a
+ * plan is granted; no row, or an expiry in the past, means the free plan. Written by
+ * the payment webhook once a MoR provider is chosen, or by hand ('manual') until then.
+ */
+export const entitlements = pgTable(
+  'entitlements',
+  {
+    userId: text('user_id')
+      .primaryKey()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    plan: text('plan', { enum: ['pro'] }).notNull(),
+    source: text('source', { enum: ['manual', 'mor'] }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  // Rows are also written by hand (and later by a webhook), so the database checks the values too.
+  t => [check('entitlements_plan_check', sql`${t.plan} in ('pro')`), check('entitlements_source_check', sql`${t.source} in ('manual', 'mor')`)],
 );

@@ -79,7 +79,7 @@ export function buildTestApp(db: Db, opts: { rateLimits?: Partial<RateLimits>; a
     storage,
     webOrigins: [WEB_ORIGIN],
     clientIpHeader: 'x-test-ip',
-    rateLimits: { perUser: unlimited, signIn: unlimited, signInEmail: unlimited, audioUpload: unlimited, ...opts.rateLimits },
+    rateLimits: { perUser: unlimited, signIn: unlimited, signInEmail: unlimited, signUp: unlimited, passwordEmail: unlimited, audioUpload: unlimited, ...opts.rateLimits },
     audioLimits: opts.audioLimits,
   });
 

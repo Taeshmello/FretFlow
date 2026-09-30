@@ -32,6 +32,14 @@ export function createAuth(config: AuthConfig) {
     socialProviders: config.google
       ? { google: { clientId: config.google.clientId, clientSecret: config.google.clientSecret } }
       : {},
+    // Email + password (hashing, sessions and checks are Better Auth's; scrypt by default).
+    // The magic link stays as the way back in for a forgotten password.
+    emailAndPassword: {
+      enabled: true,
+      minPasswordLength: 8,
+      maxPasswordLength: 128,
+      autoSignIn: true,
+    },
     plugins: [
       magicLink({
         expiresIn: 60 * 10,

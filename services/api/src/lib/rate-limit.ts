@@ -5,6 +5,8 @@ export interface RateLimitResult {
 
 export interface RateLimiter {
   hit(key: string): RateLimitResult;
+  /** Whether `key` is still within budget, without counting a hit. */
+  peek(key: string): RateLimitResult;
 }
 
 /**
@@ -33,7 +35,15 @@ export function createMemoryRateLimiter(opts: { max: number; windowMs: number; n
       w.count++;
       return { allowed: w.count <= opts.max, retryAfterSec: Math.ceil((w.resetAt - t) / 1000) };
     },
+    peek(key) {
+      const t = now();
+      const w = windows.get(key);
+      if (!w || w.resetAt <= t) {
+        return { allowed: true, retryAfterSec: 0 };
+      }
+      return { allowed: w.count < opts.max, retryAfterSec: Math.ceil((w.resetAt - t) / 1000) };
+    },
   };
 }
 
-export const unlimited: RateLimiter = { hit: () => ({ allowed: true, retryAfterSec: 0 }) };
+export const unlimited: RateLimiter = { hit: () => ({ allowed: true, retryAfterSec: 0 }), peek: () => ({ allowed: true, retryAfterSec: 0 }) };
