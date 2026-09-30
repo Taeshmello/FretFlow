@@ -27,12 +27,39 @@ interface Overlay {
 
 const EMPTY: Overlay = { cursor: null, selection: [], over: [], offset: { left: 0, top: 0 } };
 
+/** Room kept between the cursor's beat and the edge of the view when following it. */
+const FOLLOW_MARGIN = 24;
+
+function scrollParent(el: HTMLElement): HTMLElement {
+  for (let p = el.parentElement; p; p = p.parentElement) {
+    const { overflowY } = getComputedStyle(p);
+    if ((overflowY === 'auto' || overflowY === 'scroll') && p.scrollHeight > p.clientHeight) {
+      return p;
+    }
+  }
+  return (document.scrollingElement as HTMLElement | null) ?? document.documentElement;
+}
+
+/** Scrolls the least needed to bring a client-space rectangle into view (no-op when visible). */
+function keepInView(scroller: HTMLElement, top: number, bottom: number): void {
+  const isPage = scroller === document.scrollingElement || scroller === document.documentElement;
+  const viewTop = isPage ? 0 : scroller.getBoundingClientRect().top;
+  const viewBottom = isPage ? window.innerHeight : viewTop + scroller.clientHeight;
+  if (bottom - top > viewBottom - viewTop - 2 * FOLLOW_MARGIN || top < viewTop + FOLLOW_MARGIN) {
+    scroller.scrollTop -= viewTop + FOLLOW_MARGIN - top;
+  } else if (bottom > viewBottom - FOLLOW_MARGIN) {
+    scroller.scrollTop += bottom - (viewBottom - FOLLOW_MARGIN);
+  }
+}
+
 export function ScoreView({ api, containerRef, editor, audition, viewMode, dispatch, onConverted }: Props) {
   const convertedRef = useRef<Converted | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [layoutTick, setLayoutTick] = useState(0);
   const [overlay, setOverlay] = useState<Overlay>(EMPTY);
   const lastAudition = useRef(0);
+  // The cursor position the view last scrolled to; edits alone never move the view.
+  const followed = useRef('');
   const { score, cursor, selection } = editor;
 
   // Custom bar widths need the line width to break lines (layout.ts); plain scores
@@ -184,6 +211,17 @@ export function ScoreView({ api, containerRef, editor, audition, viewMode, dispa
       });
     }
     setOverlay({ cursor: cursorBox, selection: sel, over, offset });
+
+    // Follow the cursor when it moves off screen (keys, touch buttons). A beat that was
+    // just added may not be drawn yet: then this runs again after the next render.
+    const key = `${cursor.trackId}:${cursor.barIndex}:${cursor.beatIndex}:${cursor.string}`;
+    const target = beat ? beatBox(lookup, converted, beat.id) : null;
+    if (key !== followed.current && target) {
+      if (followed.current) {
+        keepInView(scrollParent(wrap), s.top + target.y, s.top + target.y + target.h);
+      }
+      followed.current = key;
+    }
   }, [api, score, cursor, selection, layoutTick, containerRef]);
 
   function handleClick(e: React.MouseEvent) {
