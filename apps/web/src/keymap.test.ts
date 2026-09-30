@@ -15,6 +15,9 @@ describe('mapKey (SPEC §5.2)', () => {
 
   it('moves by bar with Ctrl or Cmd plus arrows', () => {
     expect(mapKey(k('ArrowLeft', { metaKey: true }))).toEqual({ command: { type: 'moveBar', delta: -1 } });
+    expect(mapKey(k('ArrowRight', { metaKey: true, shiftKey: true }))).toEqual({ command: { type: 'moveBar', delta: 1, extend: true } });
+    expect(mapKey(k('v', { metaKey: true }))).toEqual({ command: { type: 'paste' } });
+    expect(mapKey(k('V', { metaKey: true, shiftKey: true }))).toEqual({ command: { type: 'paste', insert: true } });
     expect(mapKey(k('ArrowRight', { ctrlKey: true }))).toEqual({ command: { type: 'moveBar', delta: 1 } });
   });
 

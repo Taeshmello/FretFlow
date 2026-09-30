@@ -15,6 +15,8 @@ const WIDTHS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 export function BarSettings({ editor, dispatch }: Props) {
   const { score, cursor } = editor;
   const mb = score.masterBars[cursor.barIndex];
+  const barsCopied = editor.clipboard?.bars?.masterBars.length ?? 0;
+  const selectedBars = editor.selection ? Math.abs(editor.selection.head.barIndex - editor.selection.anchor.barIndex) + 1 : 1;
   return (
     <div className="settings">
       <h4>Bar {cursor.barIndex + 1}</h4>
@@ -73,6 +75,17 @@ export function BarSettings({ editor, dispatch }: Props) {
         </button>
         <button type="button" className="chip" onClick={() => dispatch({ type: 'duplicateBar' })}>
           Duplicate
+        </button>
+      </div>
+      <div className="chips">
+        <button type="button" className="chip" title="Copy this bar (or the selected bars) in every track (⌘C on a bar selection)" onClick={() => dispatch({ type: 'copyBars' })}>
+          Copy bar{selectedBars > 1 ? 's' : ''}
+        </button>
+        <button type="button" className="chip" disabled={!barsCopied} title="Replace this bar and the following ones with the copied bars (⌘V)" onClick={() => dispatch({ type: 'paste' })}>
+          Paste over{barsCopied ? ` (${barsCopied})` : ''}
+        </button>
+        <button type="button" className="chip" disabled={!barsCopied} title="Insert the copied bars before this bar (⇧⌘V)" onClick={() => dispatch({ type: 'paste', insert: true })}>
+          Insert copied
         </button>
         <button type="button" className="chip danger" disabled={score.masterBars.length <= 1} onClick={() => dispatch({ type: 'deleteBar' })}>
           Delete

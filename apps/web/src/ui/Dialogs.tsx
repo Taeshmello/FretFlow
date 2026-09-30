@@ -119,7 +119,9 @@ const SHORTCUTS: [string, string][] = [
   ['Piano: P', 'Sustain pedal on this beat: down → up → none'],
   ['Drums: 1–9, 0', 'Kick, snare, hi-hat, open hi-hat, crash, ride, toms, side stick'],
   ['⌘/Ctrl + Z / ⇧Z', 'Undo / redo'],
-  ['⌘/Ctrl + C / X / V', 'Copy / cut / paste'],
+  ['⌘/Ctrl + C / X / V', 'Copy / cut / paste (whole bars paste over the bars from the cursor)'],
+  ['⇧⌘/Ctrl + ← →', 'Select whole bars'],
+  ['⇧⌘/Ctrl + V', 'Paste copied bars as new bars before the cursor bar'],
   ['Space', 'Play / pause from the cursor'],
   ['? · ⌘/Ctrl + K', 'This list'],
 ];

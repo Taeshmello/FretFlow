@@ -19,6 +19,7 @@ import {
 } from '@fretflow/score-model';
 import { beatsInRange, cursorTrack, selectionRange, type Cursor, type Selection } from '../cursor';
 import type { Change } from '../change';
+import type { BarClip } from './barClip';
 import { clearBeatOps } from './pitched';
 
 /** Copied beats with only the notes inside the copied string range. */
@@ -31,6 +32,8 @@ export interface Clip {
   capo: number;
   /** Every string was copied, so pasting inserts whole beats. */
   wholeBeats: boolean;
+  /** Set when whole bars were copied: Cmd+V then works bar by bar (barClip.ts). */
+  bars?: BarClip;
 }
 
 export function copy(score: Score, selection: Selection | null, cursor: Cursor): Clip | null {

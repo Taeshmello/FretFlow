@@ -126,7 +126,8 @@ export function mapKey(e: KeyLike, ctx: KeyContext = GUITAR): KeyResult {
       return { command: { type: 'cut' } };
     }
     if (lower === 'v') {
-      return { command: { type: 'paste' } };
+      // Shift: copied bars go in as new bars instead of replacing the bars from the cursor.
+      return { command: e.shiftKey ? { type: 'paste', insert: true } : { type: 'paste' } };
     }
     if (lower === 'a') {
       return { command: { type: 'selectAll' } };
@@ -141,7 +142,9 @@ export function mapKey(e: KeyLike, ctx: KeyContext = GUITAR): KeyResult {
       return { command: { type: 'tuplet' } };
     }
     if (key === 'ArrowLeft' || key === 'ArrowRight') {
-      return { command: { type: 'moveBar', delta: key === 'ArrowRight' ? 1 : -1 } };
+      const delta = key === 'ArrowRight' ? 1 : -1;
+      // Shift: select whole bars (for bar copy and paste).
+      return { command: e.shiftKey ? { type: 'moveBar', delta, extend: true } : { type: 'moveBar', delta } };
     }
     return null;
   }

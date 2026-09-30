@@ -3,6 +3,7 @@ import { clampCursor, cursorNote, initialCursor, moveBar, moveString, type Curso
 import { DEFAULT_SETTINGS, type Change, type Settings } from './change';
 import { emptyHistory, popRedo, popUndo, record, type History } from './history';
 import * as bars from './commands/bars';
+import { copyBars, extendByBar, pasteBars, wholeBarRange } from './commands/barClip';
 import { copy, cut, paste, type Clip } from './commands/clipboard';
 import * as fx from './commands/effects';
 import * as pitched from './commands/pitched';
@@ -74,7 +75,7 @@ export type Command =
   | { type: 'placeFret'; string: number; fret: number }
   | { type: 'moveString'; delta: number; extend?: boolean }
   | { type: 'moveBeat'; delta: 1 | -1; extend?: boolean }
-  | { type: 'moveBar'; delta: 1 | -1 }
+  | { type: 'moveBar'; delta: 1 | -1; extend?: boolean }
   | { type: 'setCursor'; cursor: Cursor; extend?: boolean }
   | { type: 'select'; selection: Selection | null }
   | { type: 'shorter' }
@@ -119,8 +120,9 @@ export type Command =
   | { type: 'addTrack'; instrument: Instrument; tuning?: number[] }
   | { type: 'removeTrack' }
   | { type: 'copy' }
+  | { type: 'copyBars' }
   | { type: 'cut' }
-  | { type: 'paste' }
+  | { type: 'paste'; insert?: boolean }
   | { type: 'undo' }
   | { type: 'redo' }
   | { type: 'selectAll' }
@@ -200,8 +202,13 @@ function run(state: EditorState, command: Command, now: number, mergeField: bool
       const to = moveBeat(score, cursor, command.delta).cursor;
       return { ...base, cursor: to, selection: extendSelection(base, to, command.extend) };
     }
-    case 'moveBar':
+    case 'moveBar': {
+      if (command.extend) {
+        const sel = extendByBar(score, cursor, selection, command.delta);
+        return { ...base, cursor: sel.head, selection: sel };
+      }
       return { ...base, cursor: moveBar(score, cursor, command.delta), selection: null };
+    }
     case 'setCursor': {
       const to = clampCursor(score, command.cursor);
       return { ...base, cursor: to, selection: extendSelection(base, to, command.extend) };
@@ -327,17 +334,32 @@ function run(state: EditorState, command: Command, now: number, mergeField: bool
       return commit(base, tracks.removeTrack(score, trackId, cursor), now);
     case 'copy': {
       const clip = copy(score, selection, cursor);
-      return clip ? { ...base, clipboard: clip } : base;
+      const bars = wholeBarRange(score, selection);
+      return clip ? { ...base, clipboard: bars ? { ...clip, bars: copyBars(score, ...bars) } : clip } : base;
+    }
+    case 'copyBars': {
+      // The bars the selection touches, or the cursor bar.
+      const [from, to] = selection ? [Math.min(selection.anchor.barIndex, selection.head.barIndex), Math.max(selection.anchor.barIndex, selection.head.barIndex)] : [cursor.barIndex, cursor.barIndex];
+      const track = activeTrack;
+      const barSelection = {
+        anchor: { ...cursor, barIndex: from, beatIndex: 0, string: 1 },
+        head: { ...cursor, barIndex: to, beatIndex: Math.max(0, track.bars[to].beats.length - 1), string: Math.max(1, track.tuning.length) },
+      };
+      const clip = copy(score, barSelection, cursor);
+      return clip ? { ...base, clipboard: { ...clip, bars: copyBars(score, from, to) } } : base;
     }
     case 'cut': {
       const { clip, change } = cut(score, selection, cursor);
-      return clip ? { ...commit(base, change, now), clipboard: clip } : base;
+      const bars = wholeBarRange(score, selection);
+      return clip ? { ...commit(base, change, now), clipboard: bars ? { ...clip, bars: copyBars(score, ...bars) } : clip } : base;
     }
     case 'paste': {
       if (!base.clipboard) {
         return base;
       }
-      const { change, dropped } = paste(score, cursor, base.clipboard);
+      const { change, dropped } = base.clipboard.bars
+        ? pasteBars(score, cursor, base.clipboard.bars, command.insert === true)
+        : paste(score, cursor, base.clipboard);
       const next = commit(base, change, now);
       return dropped ? { ...next, notice: `${dropped} note(s) did not fit this tuning and were skipped` } : next;
     }
