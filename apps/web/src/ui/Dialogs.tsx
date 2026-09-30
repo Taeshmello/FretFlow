@@ -101,7 +101,7 @@ export function ExportDialog(p: ExportProps) {
 const SHORTCUTS: [string, string][] = [
   ['0–9', 'Fret (two digits within 0.6 s = one two-digit fret)'],
   ['↑ ↓', 'String up / down'],
-  ['← →', 'Beat (→ on the last beat adds a bar)'],
+  ['← →', 'Beat (→ on the last beat adds a beat while the bar has room, then a bar)'],
   ['Shift + arrows', 'Extend the selection'],
   ['⌘/Ctrl + ← →', 'Bar'],
   ['+ / -', 'Shorter / longer duration'],
@@ -182,7 +182,7 @@ export function LicensesDialog({ onClose }: { onClose: () => void }) {
 
 const STEPS = [
   { title: 'Type straight into the tab', body: 'Press a number to put that fret on the cursor string. Press 1 then 2 quickly for fret 12.' },
-  { title: 'Move around', body: '↑↓ change string, ←→ change beat. → on the last beat adds a bar. You can also click the score.' },
+  { title: 'Move around', body: '↑↓ change string, ←→ change beat. → on the last beat fills the bar with beats of the same length, then adds a bar. You can also click the score.' },
   { title: 'Rhythm and technique', body: '+ / − change duration, . adds a dot, R makes a rest. H hammer-on, S slide, B bend, M palm mute — or use the panel on the right.' },
   { title: 'Listen and practise', body: 'Space plays from the cursor. Add your own recording to slow it down and loop a passage.' },
   { title: 'Saved as you go', body: 'Your score saves in this browser a second after each edit. Press ? any time for shortcuts. Piano and drums: letters A–G or number keys.' },

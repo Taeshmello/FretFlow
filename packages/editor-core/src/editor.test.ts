@@ -130,6 +130,38 @@ describe('navigation', () => {
     expect(validateScore(s.score)).toEqual([]);
   });
 
+  it('adds a beat inside the bar when moving right from the last beat of a bar with room left', () => {
+    // Four eighths leave half of a 4/4 bar empty: → keeps adding eighths until it is full.
+    let s = run(fresh(createScore({ bars: 2 })), [{ type: 'selectAll' }, { type: 'setDuration', base: 8 }, { type: 'select', selection: null }]);
+    s = { ...s, cursor: { ...s.cursor, barIndex: 0, beatIndex: 3 } };
+    for (let i = 0; i < 4; i++) {
+      s = execute(s, { type: 'moveBeat', delta: 1 }, 1000 * i);
+    }
+    const bar = s.score.tracks[0].bars[0];
+    expect(bar.beats.map(b => b.duration.base)).toEqual([8, 8, 8, 8, 8, 8, 8, 8]);
+    expect(bar.beats.slice(4).every(b => b.rest)).toBe(true);
+    expect(s.cursor).toMatchObject({ barIndex: 0, beatIndex: 7 });
+    // Now the bar is full: → goes on to the next bar without adding anything.
+    s = execute(s, { type: 'moveBeat', delta: 1 }, 9000);
+    expect(s.cursor).toMatchObject({ barIndex: 1, beatIndex: 0 });
+    expect(s.score.tracks[0].bars[0].beats).toHaveLength(8);
+    expect(validateScore(s.score)).toEqual([]);
+  });
+
+  it('shortens the added beat to what is left of the bar, and undoes it in one step', () => {
+    // Quarter, quarter, quarter, eighth: an eighth is left, so → adds an eighth, not a quarter.
+    let s = fresh(createScore({ bars: 1 }));
+    s = { ...s, cursor: { ...s.cursor, beatIndex: 3 } };
+    s = execute(s, { type: 'setDuration', base: 8 }, 0);
+    s = { ...s, cursor: { ...s.cursor, beatIndex: 2 } };
+    s = execute(s, { type: 'moveBeat', delta: 1 }, 1000);
+    s = execute(s, { type: 'moveBeat', delta: 1 }, 2000);
+    expect(s.score.tracks[0].bars[0].beats.map(b => b.duration.base)).toEqual([4, 4, 4, 8, 8]);
+    expect(s.score.masterBars).toHaveLength(1);
+    const undone = execute(s, { type: 'undo' }, 3000);
+    expect(undone.score.tracks[0].bars[0].beats.map(b => b.duration.base)).toEqual([4, 4, 4, 8]);
+  });
+
   it('crosses bar lines going left and stops at the first beat', () => {
     let s = run(fresh(), [{ type: 'moveBar', delta: 1 }, { type: 'moveBeat', delta: -1 }]);
     expect(s.cursor).toMatchObject({ barIndex: 0, beatIndex: 3 });
