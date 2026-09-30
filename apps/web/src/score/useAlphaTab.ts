@@ -59,10 +59,25 @@ export function useAlphaTab(scrollElement: React.RefObject<HTMLElement | null>) 
         enableAnimatedBeatCursor: true,
         enableUserInteraction: false,
         scrollElement: scrollElement.current ?? undefined,
-        scrollMode: alphaTab.ScrollMode.Continuous,
+        // Follow the playback cursor only while playing (see below).
+        scrollMode: alphaTab.ScrollMode.Off,
       },
     });
-    const off = instance.error.on(e => setError(e.message));
+    // With scrolling on, every re-render after an edit scrolled back to the (stopped)
+    // playback cursor, i.e. to the first bar. Scroll along only during playback; the
+    // settings update creates alphaTab's scroll handler for the new mode.
+    const offState = instance.playerStateChanged.on(e => {
+      const mode = e.state === alphaTab.synth.PlayerState.Playing ? alphaTab.ScrollMode.Continuous : alphaTab.ScrollMode.Off;
+      if (instance.settings.player.scrollMode !== mode) {
+        instance.settings.player.scrollMode = mode;
+        instance.updateSettings();
+      }
+    });
+    const offError = instance.error.on(e => setError(e.message));
+    const off = () => {
+      offState();
+      offError();
+    };
     setApi(instance);
     return () => {
       off();
