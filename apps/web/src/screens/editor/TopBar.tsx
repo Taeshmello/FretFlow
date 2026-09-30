@@ -16,6 +16,8 @@ interface Props {
   onRedo: () => void;
   onExport: () => void;
   onBack: () => void;
+  /** Sign-in / account button (absent in local-only builds). */
+  account?: React.ReactNode;
 }
 
 /** Title, breadcrumb and save state; Write/Practice; undo, export, share (design page 1). */
@@ -49,6 +51,7 @@ export function TopBar(p: Props) {
         <button type="button" className="btn export-trigger" onClick={p.onExport} aria-label="Export">
           <Download size={17} /><span>Export</span>
         </button>
+        {p.account}
         <button type="button" className="btn primary share-trigger" disabled title="Sharing is coming in a later version">
           <Share2 size={18} /> Share
         </button>

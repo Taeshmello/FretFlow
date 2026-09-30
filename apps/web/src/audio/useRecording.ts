@@ -49,6 +49,8 @@ export function useRecording(scoreId: string, score: Score, synth: SynthLink) {
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [rate, setRateState] = useState(1);
+  /** Allowed speeds for the plan; kept for a player created later. */
+  const rateRangeRef = useRef<[number, number]>([0.5, 1]);
   const [loop, setLoopState] = useState<LoopRegion | null>(null);
   const [mix, setMixState] = useState(0);
   const [map, setMap] = useState<SyncMap>(emptySyncMap());
@@ -73,7 +75,7 @@ export function useRecording(scoreId: string, score: Score, synth: SynthLink) {
       const ctx = new AudioContext();
       const fader = new Crossfader(ctx);
       fader.onSynthGain(g => synthRef.current.setVolume(g));
-      const player = new AudioTrackPlayer(ctx, { destination: fader.input });
+      const player = new AudioTrackPlayer(ctx, { destination: fader.input, rateRange: rateRangeRef.current });
       player.onTime(t => {
         // A jump (seek or loop wrap) means the click grid and the synth must be re-aligned.
         const expected = lastTimeRef.current;
@@ -223,6 +225,10 @@ export function useRecording(scoreId: string, score: Score, synth: SynthLink) {
       if (player) {
         player.rate = r;
       }
+    },
+    setRateRange(range: [number, number]) {
+      rateRangeRef.current = range;
+      playerRef.current?.setRateRange(range);
     },
     setMix(m: number) {
       setMixState(m);

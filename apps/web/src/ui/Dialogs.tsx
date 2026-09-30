@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { PrintOptions } from '../app/files';
+import { printsFooter } from '../app/plan';
+import { usePlan } from '../app/session';
 
 export function Modal({ title, onClose, children, wide, className = '' }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; className?: string }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -37,6 +39,7 @@ export function ExportDialog(p: ExportProps) {
   const [staves, setStaves] = useState<PrintOptions['staves']>('scoreTab');
   const [useSelection, setUseSelection] = useState(false);
   const [format, setFormat] = useState<'pdf' | 'midi' | 'gp' | 'json'>('pdf');
+  const plan = usePlan();
   const selections = [
     { id: 'pdf', title: 'PDF', detail: 'Print or read anywhere' },
     { id: 'midi', title: 'MIDI', detail: 'Open in a DAW' },
@@ -45,7 +48,7 @@ export function ExportDialog(p: ExportProps) {
   ] as const;
   const exportFile = () => {
     if (format === 'pdf') {
-      p.onPdf({ paper, staves, range: useSelection && p.selection ? p.selection : null });
+      p.onPdf({ paper, staves, range: useSelection && p.selection ? p.selection : null, footer: printsFooter(plan) });
     } else if (format === 'midi') {
       p.onMidi();
     } else if (format === 'gp') {
@@ -81,14 +84,14 @@ export function ExportDialog(p: ExportProps) {
               </fieldset>
             </div>
           )}
-          <p className="muted small export-help">{format === 'pdf' ? 'Choose “Save as PDF” in the print window. Free exports have a small “Made with FretFlow” footer.' : 'Recordings and beat maps are never included in exported files.'}</p>
+          <p className="muted small export-help">{format === 'pdf' ? `Choose “Save as PDF” in the print window. ${printsFooter(plan) ? 'Free exports have a small “Made with FretFlow” footer; Pro removes it.' : 'Pro: no FretFlow footer.'}` : 'Recordings and beat maps are never included in exported files.'}</p>
         </div>
         <div className="export-preview" aria-label="Page layout preview">
           <div className={`preview-page ${paper}`}>
             <div className="preview-title">Score export</div>
             <div className="preview-caption">{staves === 'scoreTab' ? 'Staff + TAB' : staves === 'score' ? 'Staff' : 'TAB'} · {paper.toUpperCase()}</div>
             <div className="preview-system" /><div className="preview-system" /><div className="preview-system" />
-            <div className="preview-footer">Made with FretFlow</div>
+            {printsFooter(plan) && <div className="preview-footer">Made with FretFlow</div>}
           </div>
           <span className="muted small">Layout preview · the real pages appear in the print window</span>
         </div>

@@ -1,4 +1,6 @@
 import { Metronome, Repeat } from 'lucide-react';
+import { speedPresets, speedRange } from '../../app/plan';
+import { usePlan } from '../../app/session';
 
 interface Props {
   speed: number;
@@ -14,6 +16,8 @@ interface Props {
 
 /** Controls kept beside the score on desktop and below it on touch screens. */
 export function PracticePanel(p: Props) {
+  const plan = usePlan();
+  const [min, max] = speedRange(plan);
   const loopText = p.loopBars
     ? `Bars ${p.loopBars[0]}${p.loopBars[0] === p.loopBars[1] ? '' : `–${p.loopBars[1]}`}`
     : `Current bar ${p.currentBar}`;
@@ -28,19 +32,19 @@ export function PracticePanel(p: Props) {
       <input
         className="practice-speed"
         type="range"
-        min={50}
-        max={100}
+        min={min * 100}
+        max={max * 100}
         step={5}
         value={Math.round(p.speed * 100)}
         aria-label="Speed"
         onChange={e => p.onSpeed(Number(e.target.value) / 100)}
       />
       <div className="practice-speed-presets" role="group" aria-label="Speed presets">
-        {[50, 60, 70, 80, 90, 100].map(value => (
+        {speedPresets(plan).map(value => (
           <button type="button" key={value} aria-pressed={Math.round(p.speed * 100) === value} onClick={() => p.onSpeed(value / 100)}>{value}%</button>
         ))}
       </div>
-      <p className="muted small">Pitch stays the same when you slow down.</p>
+      <p className="muted small">Pitch stays the same when you slow down.{plan === 'pro' ? '' : ' 25–150% comes with Pro.'}</p>
       <div className="practice-control-divider" />
       <button type="button" className={`practice-loop-button${p.looping ? ' active' : ''}`} aria-pressed={p.looping} onClick={p.onLoop}>
         <Repeat size={17} />

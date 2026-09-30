@@ -168,7 +168,14 @@ export function App() {
     <>
       {store ? (
         <Suspense fallback={<div className="editor-loading">Loading the editor…</div>}>
-          <Editor key={store.state.score.id} store={store} onBack={back} saveLabel={SAVE_LABEL[saveStatus]} saveError={saveStatus === 'error'} />
+          <Editor
+            key={store.state.score.id}
+            store={store}
+            onBack={back}
+            saveLabel={SAVE_LABEL[saveStatus]}
+            saveError={saveStatus === 'error'}
+            account={<Account variant="menu" onSignedIn={() => void syncNow()} />}
+          />
         </Suspense>
       ) : (
         <Library

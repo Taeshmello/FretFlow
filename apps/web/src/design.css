@@ -332,7 +332,8 @@
     padding-bottom: min(45vh, 360px);
   }
 
-  .editor-v2 .topbar-actions .export-trigger {
+  .editor-v2 .topbar-actions .export-trigger,
+  .editor-v2 .topbar-actions .account-trigger {
     display: inline-flex;
     width: 38px;
     height: 38px;
@@ -341,7 +342,8 @@
     justify-content: center;
   }
 
-  .editor-v2 .topbar-actions .export-trigger span {
+  .editor-v2 .topbar-actions .export-trigger span,
+  .editor-v2 .topbar-actions .account-trigger span {
     display: none;
   }
 

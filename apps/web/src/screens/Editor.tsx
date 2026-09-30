@@ -18,6 +18,7 @@ import { previewDrum, previewPitch } from '../audio/preview';
 import { TempoSettings } from '../ui/Settings';
 import { ScoreCard } from './editor/ScoreCard';
 import { TopBar, type Mode } from './editor/TopBar';
+import { useSpeed } from '../player/useSpeed';
 import { TransportBar } from './editor/TransportBar';
 import { TouchInput } from './editor/TouchInput';
 import { PracticePanel } from './editor/PracticePanel';
@@ -27,9 +28,10 @@ interface Props {
   onBack: () => void;
   saveLabel: string;
   saveError: boolean;
+  account?: React.ReactNode;
 }
 
-export function Editor({ store, onBack, saveLabel, saveError }: Props) {
+export function Editor({ store, onBack, saveLabel, saveError, account }: Props) {
   const { editor, audition } = useEditor(store);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { containerRef, api, error } = useAlphaTab(scrollRef);
@@ -76,6 +78,12 @@ export function Editor({ store, onBack, saveLabel, saveError }: Props) {
     pause: playback.pause,
     getTick: getSynthTick,
     seek: seekSynth,
+  });
+  const setSpeed = useSpeed({
+    speed: recording.loaded ? recording.rate : playback.state.speed,
+    setRecordingRate: recording.setRate,
+    setRecordingRange: recording.setRateRange,
+    setSynthSpeed: speed => playback.update({ speed }),
   });
 
   const loopSelection = useCallback(() => {
@@ -170,10 +178,6 @@ export function Editor({ store, onBack, saveLabel, saveError }: Props) {
     loopSelection();
   }
 
-  function setSpeed(speed: number) {
-    recording.setRate(speed);
-    playback.update({ speed });
-  }
 
   function toggleMetronome() {
     if (recording.loaded) {
@@ -211,6 +215,7 @@ export function Editor({ store, onBack, saveLabel, saveError }: Props) {
         onRedo={() => dispatch({ type: 'redo' })}
         onExport={() => setDialog('export')}
         onBack={onBack}
+        account={account}
       />
       {saveError && <div className="banner error">Saving failed. Check your browser storage; your edits will be retried on the next save.</div>}
       {error && <div className="banner error">Score display error: {error}</div>}

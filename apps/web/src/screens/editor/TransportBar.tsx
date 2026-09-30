@@ -1,6 +1,8 @@
 import { Metronome, Pause, Play, Repeat } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Popover } from '../../ui/Popover';
+import { speedPresets, speedRange } from '../../app/plan';
+import { usePlan } from '../../app/session';
 
 interface Props {
   playing: boolean;
@@ -28,6 +30,8 @@ interface Props {
 
 /** Play button, position and practice pills (design page 1). */
 export function TransportBar(p: Props) {
+  const plan = usePlan();
+  const range = speedRange(plan);
   return (
     <div className="transport" role="toolbar" aria-label="Playback">
       <button type="button" className="play-btn" aria-label={p.playing ? 'Pause' : 'Play'} disabled={!p.ready} title="Play / pause (Space)" onClick={p.onPlayPause}>
@@ -47,15 +51,15 @@ export function TransportBar(p: Props) {
       >
         <div className="settings">
           <h4>Speed · pitch stays the same</h4>
-          <input type="range" min={50} max={100} step={5} value={Math.round(p.speed * 100)} onChange={e => p.onSpeed(Number(e.target.value) / 100)} />
+          <input type="range" min={range[0] * 100} max={range[1] * 100} step={5} value={Math.round(p.speed * 100)} onChange={e => p.onSpeed(Number(e.target.value) / 100)} />
           <div className="chips">
-            {[50, 60, 70, 80, 90, 100].map(v => (
+            {speedPresets(plan).map(v => (
               <button key={v} type="button" className="chip mono" aria-pressed={Math.round(p.speed * 100) === v} onClick={() => p.onSpeed(v / 100)}>
                 {v}%
               </button>
             ))}
           </div>
-          <p className="muted small">25–150% comes with Pro.</p>
+          <p className="muted small">{plan === 'pro' ? 'Pro: 25–150%.' : '25–150% comes with Pro.'}</p>
         </div>
       </Popover>
       <button type="button" className="pill" disabled title="Pitch control is planned for Pro">

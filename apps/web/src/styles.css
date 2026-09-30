@@ -331,11 +331,71 @@ kbd {
   flex-wrap: wrap;
 }
 
-.login {
+.account-trigger span {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #eceee8;
+  color: var(--muted);
+}
+
+.plan-badge.pro {
+  background: #e4ebff;
+  color: #2f5bdb;
+}
+
+.modal.signin-modal {
+  width: min(400px, calc(100vw - 32px));
+}
+
+.signin-modal .modal-body {
+  display: grid;
+  gap: 12px;
+}
+
+.signin-modal p {
+  margin: 0;
+}
+
+.signin-tabs {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: min(100%, 320px);
+}
+
+.signin-tabs button {
+  flex: 1;
+}
+
+.signin-form {
+  display: grid;
+  gap: 10px;
+}
+
+.signin-form input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.signin-or {
+  text-align: center;
+}
+
+.account-menu {
+  display: grid;
+  gap: 10px;
+  width: min(320px, calc(100vw - 32px));
+}
+
+.account-menu p {
+  margin: 0;
 }
 
 .login-social {
@@ -344,28 +404,14 @@ kbd {
   gap: 6px;
 }
 
-.login .social {
+.login-social .social {
   justify-content: center;
   gap: 8px;
 }
 
-.login .social small {
+.login-social .social small {
   font-size: 11px;
   opacity: 0.7;
-}
-
-.login-or {
-  text-align: center;
-}
-
-.login-email {
-  display: flex;
-  gap: 6px;
-}
-
-.login-email input {
-  flex: 1;
-  min-width: 0;
 }
 
 /* ---------- editor ---------- */
@@ -526,7 +572,8 @@ kbd {
   padding: 5px 10px;
 }
 
-.segmented button[aria-checked='true'] {
+.segmented button[aria-checked='true'],
+.segmented button[role='tab'][aria-selected='true'] {
   background: var(--ink);
   color: var(--panel);
 }
@@ -1092,7 +1139,8 @@ kbd {
   padding: 7px 16px;
 }
 
-.segmented button[aria-checked='true'] {
+.segmented button[aria-checked='true'],
+.segmented button[role='tab'][aria-selected='true'] {
   color: var(--ink);
   background: #fff;
   box-shadow: 0 1px 5px rgba(18, 22, 18, 0.12);
@@ -1635,8 +1683,9 @@ kbd {
     min-width: 0;
   }
 
-  .topbar-actions .btn,
-  .topbar-actions .icon-btn {
+  /* Only the bar's own buttons: the account popover inside it keeps its form buttons. */
+  .topbar-actions > .btn,
+  .topbar-actions > .icon-btn {
     display: none;
   }
 

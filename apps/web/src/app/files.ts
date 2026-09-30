@@ -25,6 +25,8 @@ export interface PrintOptions {
   staves: 'scoreTab' | 'tab' | 'score';
   /** 1-based inclusive bar range; null = whole score. */
   range: [number, number] | null;
+  /** "Made with FretFlow" at the bottom: free plan only (plan.ts). */
+  footer: boolean;
 }
 
 /**
@@ -38,7 +40,7 @@ export function printScore(api: alphaTab.AlphaTabApi, opts: PrintOptions): void 
   if (!score) {
     return;
   }
-  score.copyright = 'Made with FretFlow';
+  score.copyright = opts.footer ? 'Made with FretFlow' : '';
   // Custom bar widths break lines for the screen; re-break them for the page (96 px per inch).
   const pagePx = opts.paper === 'a4' ? 794 : 816;
   const [padX] = api.settings.display.padding.length ? api.settings.display.padding : [0];
@@ -50,7 +52,7 @@ export function printScore(api: alphaTab.AlphaTabApi, opts: PrintOptions): void 
     },
     notation: {
       elements: new Map([
-        [alphaTab.NotationElement.ScoreCopyright, true],
+        [alphaTab.NotationElement.ScoreCopyright, opts.footer],
         [alphaTab.NotationElement.ScoreTitle, true],
         [alphaTab.NotationElement.ScoreArtist, true],
         [alphaTab.NotationElement.GuitarTuning, true],
