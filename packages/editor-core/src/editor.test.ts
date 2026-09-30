@@ -409,6 +409,28 @@ describe('piano input (D-023)', () => {
   });
 });
 
+describe('piano sustain pedal', () => {
+  const pedalOf = (s: EditorState) => cursorBeat(s.score, s.cursor)?.pedal;
+
+  it('cycles the cursor beat through pedal down, pedal up and no mark, one undo each', () => {
+    let s = run(fresh(createScore({ instrument: 'piano', bars: 1 })), [{ type: 'pedal' }]);
+    expect(pedalOf(s)).toBe('down');
+    s = run(s, [{ type: 'pedal' }]);
+    expect(pedalOf(s)).toBe('up');
+    s = run(s, [{ type: 'pedal' }]);
+    expect(pedalOf(s)).toBeUndefined();
+    expect('pedal' in (cursorBeat(s.score, s.cursor) ?? {})).toBe(false);
+    expect(validateScore(s.score)).toEqual([]);
+    s = run(s, [{ type: 'undo' }]);
+    expect(pedalOf(s)).toBe('up');
+  });
+
+  it('does nothing on other instruments', () => {
+    const g = fresh();
+    expect(execute(g, { type: 'pedal' }, 0).score).toBe(g.score);
+  });
+});
+
 describe('drum input (D-023)', () => {
   const drums = () => fresh(createScore({ instrument: 'drums', bars: 1 }));
   const hitsOf = (s: EditorState) => cursorBeat(s.score, s.cursor)?.hits?.map(h => h.piece) ?? [];

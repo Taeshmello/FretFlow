@@ -73,6 +73,7 @@ describe('mapKey on piano and drum tracks (D-023)', () => {
   it('keeps rhythm, rest, tie and navigation keys on piano, and drops fret digits', () => {
     expect(mapKey(k('r'), piano)).toEqual({ command: { type: 'rest' } });
     expect(mapKey(k('t'), piano)).toEqual({ command: { type: 'tie' } });
+    expect(mapKey(k('p'), piano)).toEqual({ command: { type: 'pedal' } });
     expect(mapKey(k('+'), piano)).toEqual({ command: { type: 'shorter' } });
     expect(mapKey(k('ArrowRight'), piano)).toEqual({ command: { type: 'moveBeat', delta: 1, extend: false } });
     expect(mapKey(k('5'), piano)).toBeNull();

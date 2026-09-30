@@ -1,5 +1,6 @@
 import * as alphaTab from '@coderline/alphatab';
 import { DRUM_ORDER, DRUM_PIECES, isFretted, type Beat, type DrumHit, type DrumPiece, type Id, type MasterBar, type Note, type NoteEffects, type Score, type Track } from '@fretflow/score-model';
+import { addPedalMarkers, type PedalMarkers } from './pedal';
 import { toAlphaTabString } from './strings';
 
 const at = alphaTab.model;
@@ -196,6 +197,7 @@ function convertTrack(
   score: Score,
   options: ConvertOptions,
   out: Converted,
+  pedals: PedalMarkers,
 ): alphaTab.model.Track {
   const t = new at.Track();
   t.name = track.name;
@@ -227,6 +229,7 @@ function convertTrack(
   }
 
   const stringCount = track.tuning.length;
+  let pedalDown = false;
   track.bars.forEach((bar, barIndex) => {
     staves.forEach((staff, staffIndex) => {
       const b = new at.Bar();
@@ -261,6 +264,9 @@ function convertTrack(
         voice.addBeat(converted);
         out.refs.set(converted, { trackIndex, barIndex, beatIndex, beatId: beat.id });
       });
+      if (grand && staffIndex === staves.length - 1) {
+        pedalDown = addPedalMarkers(b, bar.beats, score.masterBars[barIndex], pedalDown, pedals);
+      }
       if (bar.beats.length === 0) {
         const empty = new at.Beat();
         empty.isEmpty = true;
@@ -281,7 +287,13 @@ export function toAlphaTab(score: Score, options: ConvertOptions, settings: alph
   for (const mb of score.masterBars) {
     s.addMasterBar(convertMasterBar(mb));
   }
-  score.tracks.forEach((track, i) => s.addTrack(convertTrack(track, i, score, options, out)));
+  const pedals: PedalMarkers = [];
+  score.tracks.forEach((track, i) => s.addTrack(convertTrack(track, i, score, options, out, pedals)));
   s.finish(settings);
+  // Bar.finish turns every Down in a bar that the pedal enters held into a Hold,
+  // which would drop a re-pedal (Up then Down) from the drawing and the GP export.
+  for (const [marker, type] of pedals) {
+    marker.pedalType = type;
+  }
   return out;
 }

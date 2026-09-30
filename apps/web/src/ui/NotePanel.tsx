@@ -170,6 +170,11 @@ export function NotePanel({ editor, dispatch }: Props) {
           <button type="button" className="chip" aria-pressed={!!note?.tieFromPrev || !!beat?.keys?.some(k => k.tieFromPrev)} disabled={track.instrument === 'drums' || (fretted && !note) || (!fretted && !beat?.keys?.length)} onClick={() => dispatch({ type: 'tie' })}>
             Tie
           </button>
+          {track.instrument === 'piano' && (
+            <button type="button" className="chip" aria-pressed={beat?.pedal !== undefined} disabled={!beat} title="Sustain pedal at this beat: down → up → none (P)" onClick={() => dispatch({ type: 'pedal' })}>
+              {beat?.pedal === 'down' ? 'Pedal down' : beat?.pedal === 'up' ? 'Pedal up' : 'Pedal'}
+            </button>
+          )}
         </div>
       </section>
 

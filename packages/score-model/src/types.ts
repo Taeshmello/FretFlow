@@ -64,12 +64,19 @@ export interface Beat {
   keys?: KeyNote[];
   /** Drums: one hit per kit piece. Only on drum tracks. */
   hits?: DrumHit[];
+  /**
+   * Piano sustain pedal at the start of this beat: 'down' presses it (or re-pedals when
+   * it is already down), 'up' releases it. Only on piano tracks.
+   */
+  pedal?: Pedal;
   /** User-authored chord symbol shown above the stave, e.g. Am7 or G/B. */
   chord?: string;
   /** Syllable or short lyric phrase attached to this beat. */
   lyric?: string;
   text?: string;
 }
+
+export type Pedal = 'down' | 'up';
 
 export type NoteSource = 'user' | 'import' | 'ai';
 

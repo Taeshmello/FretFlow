@@ -113,6 +113,7 @@ const SHORTCUTS: [string, string][] = [
   ['H P · S · B · V', 'Hammer-on/pull-off · slide · bend · vibrato'],
   ['M · X · L · T', 'Palm mute · dead note · let ring · tie'],
   ['Piano: A–G', 'Add or remove a note (Shift = sharp), Z / X octave, ↑ ↓ transpose'],
+  ['Piano: P', 'Sustain pedal on this beat: down → up → none'],
   ['Drums: 1–9, 0', 'Kick, snare, hi-hat, open hi-hat, crash, ride, toms, side stick'],
   ['⌘/Ctrl + Z / ⇧Z', 'Undo / redo'],
   ['⌘/Ctrl + C / X / V', 'Copy / cut / paste'],

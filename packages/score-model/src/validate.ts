@@ -18,6 +18,7 @@ export interface ValidationIssue {
     | 'duplicateHit'
     | 'drumPiece'
     | 'wrongNoteKind'
+    | 'pedal'
     | 'duration'
     | 'timeSig'
     | 'keySig'
@@ -87,6 +88,9 @@ export function validateScore(score: Score): ValidationIssue[] {
         const fretted = isFretted(track.instrument);
         if ((!fretted && beat.notes.length) || (track.instrument !== 'piano' && keys.length) || (track.instrument !== 'drums' && hits.length)) {
           issues.push({ code: 'wrongNoteKind', message: `${track.instrument} track holds notes of another instrument`, id: beat.id });
+        }
+        if (beat.pedal !== undefined && (track.instrument !== 'piano' || (beat.pedal !== 'down' && beat.pedal !== 'up'))) {
+          issues.push({ code: 'pedal', message: `pedal ${String(beat.pedal)} on a ${track.instrument} track`, id: beat.id });
         }
         const pitches = new Set<number>();
         for (const key of keys) {

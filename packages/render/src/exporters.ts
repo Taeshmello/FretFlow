@@ -1,5 +1,6 @@
 import * as alphaTab from '@coderline/alphatab';
 import type { Score } from '@fretflow/score-model';
+import { addPedalControllers, pedalChanges } from './pedal';
 import { toAlphaTab } from './toAlphaTab';
 
 /** Standard MIDI file, one channel pair per track (SPEC §9). */
@@ -8,7 +9,9 @@ export function exportMidi(score: Score): Uint8Array {
   const { score: model } = toAlphaTab(score, { staffMode: 'scoreTab' }, settings);
   const midi = new alphaTab.midi.MidiFile();
   const handler = new alphaTab.midi.AlphaSynthMidiFileHandler(midi, true);
-  new alphaTab.midi.MidiFileGenerator(model, settings, handler).generate();
+  const generator = new alphaTab.midi.MidiFileGenerator(model, settings, handler);
+  generator.generate();
+  addPedalControllers(midi, model, pedalChanges(score, generator.tickLookup, midi.tickShift));
   return midi.toBinary();
 }
 

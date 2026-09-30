@@ -81,6 +81,12 @@ describe('validateScore for piano and drums', () => {
     expect(withBeat('piano', b => (b.hits = [createDrumHit('kick')]))).toContain('wrongNoteKind');
   });
 
+  it('allows the sustain pedal on piano tracks only', () => {
+    expect(withBeat('piano', b => (b.pedal = 'down'))).toEqual([]);
+    expect(withBeat('guitar', b => (b.pedal = 'down'))).toContain('pedal');
+    expect(withBeat('piano', b => ((b as { pedal?: string }).pedal = 'half'))).toContain('pedal');
+  });
+
   it('flags a rest that still has keys or hits', () => {
     const score = createScore({ instrument: 'piano', bars: 1 });
     score.tracks[0].bars[0].beats[0].keys = [createKeyNote(60)];

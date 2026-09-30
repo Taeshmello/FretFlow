@@ -87,6 +87,9 @@ function pianoKey(e: KeyLike, lower: string, octave: number): KeyResult {
   if (lower === 't') {
     return { command: { type: 'tie' } };
   }
+  if (lower === 'p') {
+    return { command: { type: 'pedal' } };
+  }
   return sharedKey(e, e.key);
 }
 

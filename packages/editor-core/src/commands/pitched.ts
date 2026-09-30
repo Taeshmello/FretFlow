@@ -95,6 +95,16 @@ export function cycleHitDynamic(score: Score, cursor: Cursor, piece: DrumPiece):
   return { ops: [setOp(score, hit.id, ['dynamic'], next)], label: 'drum dynamic' };
 }
 
+/** Piano P: pedal down → pedal up → no mark on the cursor beat. */
+export function cyclePedal(score: Score, cursor: Cursor): Change | null {
+  const h = here(score, cursor);
+  if (!h.beat || h.track.instrument !== 'piano') {
+    return null;
+  }
+  const next = h.beat.pedal === undefined ? 'down' : h.beat.pedal === 'down' ? 'up' : undefined;
+  return { ops: [setOp(score, h.beat.id, ['pedal'], next)], label: 'pedal' };
+}
+
 /** The beat before the cursor in the same track, across bar lines. */
 function previousBeat(score: Score, cursor: Cursor): Beat | undefined {
   const track = score.tracks.find(t => t.id === cursor.trackId);

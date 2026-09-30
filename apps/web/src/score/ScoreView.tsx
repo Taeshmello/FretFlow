@@ -1,6 +1,6 @@
 import * as alphaTab from '@coderline/alphatab';
 import { beatsInRange, selectionRange, type Command, type EditorState } from '@fretflow/editor-core';
-import { beatBox, cellAt, cellBox, toAlphaTab, type Box, type Converted } from '@fretflow/render';
+import { beatBox, cellAt, cellBox, pedalChanges, sustainNoteOffs, toAlphaTab, type Box, type Converted } from '@fretflow/render';
 import { barFill } from '@fretflow/score-model';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Audition } from '../app/store';
@@ -86,6 +86,22 @@ export function ScoreView({ api, containerRef, editor, audition, viewMode, dispa
       return;
     }
     return api.postRenderFinished.on(() => setLayoutTick(t => t + 1));
+  }, [api]);
+
+  // alphaSynth ignores the sustain pedal controller, so bake the pedal into the notes
+  // before the MIDI reaches the player (midiLoad fires after the tick lookup is built).
+  const scoreRef = useRef(score);
+  scoreRef.current = score;
+  useEffect(() => {
+    if (!api) {
+      return;
+    }
+    return api.midiLoad.on(midi => {
+      const current = scoreRef.current;
+      if (api.score && api.tickCache && current.tracks.some(t => t.instrument === 'piano')) {
+        sustainNoteOffs(midi, api.score, pedalChanges(current, api.tickCache, midi.tickShift));
+      }
+    });
   }, [api]);
 
   // Audition: sound the note that was just entered. This uses the short Web Audio

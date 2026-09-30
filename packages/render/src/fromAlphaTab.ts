@@ -1,4 +1,5 @@
 import * as alphaTab from '@coderline/alphatab';
+import { importPedals } from './pedal';
 import {
   createBar,
   DRUM_ORDER,
@@ -298,6 +299,7 @@ function pianoBar(t: alphaTab.model.Track, i: number, mb: MasterBar, report: Rep
     out.rest = !out.keys?.length;
     return out;
   });
+  importPedals(t, i, top, beats);
   return { id: newId(), masterBarId: mb.id, beats };
 }
 
