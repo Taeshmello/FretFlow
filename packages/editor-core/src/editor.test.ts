@@ -230,6 +230,43 @@ describe('effects', () => {
     expect(cursorNote(s.score, s.cursor)?.effects).toEqual({ palmMute: true, dead: true, letRing: true, vibrato: 'slight', hammerPull: true });
   });
 
+  it('cycles harmonics natural → artificial → pinch → none and sets any kind exactly', () => {
+    let s = run(fresh(), [digit(7)]);
+    const seen: unknown[] = [];
+    for (let i = 0; i < 4; i++) {
+      s = run(s, [{ type: 'harmonic' }]);
+      seen.push(cursorNote(s.score, s.cursor)?.effects.harmonic);
+    }
+    expect(seen).toEqual(['natural', 'artificial', 'pinch', undefined]);
+    s = run(s, [{ type: 'setEffect', key: 'harmonic', value: 'semi' }]);
+    expect(cursorNote(s.score, s.cursor)?.effects.harmonic).toBe('semi');
+  });
+
+  it('cycles tremolo picking on the cursor beat through eighths, sixteenths and thirty-seconds', () => {
+    let s = run(fresh(), [digit(5)]);
+    const seen: unknown[] = [];
+    for (let i = 0; i < 4; i++) {
+      s = run(s, [{ type: 'tremolo' }]);
+      seen.push(cursorBeat(s.score, s.cursor)?.tremolo);
+    }
+    expect(seen).toEqual([8, 16, 32, undefined]);
+    expect('tremolo' in (cursorBeat(s.score, s.cursor) ?? {})).toBe(false);
+    s = run(s, [{ type: 'tremolo', speed: 16 }]);
+    expect(cursorBeat(s.score, s.cursor)?.tremolo).toBe(16);
+    s = run(s, [{ type: 'tremolo', speed: null }]);
+    expect(cursorBeat(s.score, s.cursor)?.tremolo).toBeUndefined();
+    // A rest has nothing to pick.
+    const rest = fresh();
+    expect(execute(rest, { type: 'tremolo' }, 0).score).toBe(rest.score);
+  });
+
+  it('toggles tapping on the cursor note', () => {
+    let s = run(fresh(), [digit(5), { type: 'tap' }]);
+    expect(cursorNote(s.score, s.cursor)?.effects.tap).toBe(true);
+    s = run(s, [{ type: 'tap' }]);
+    expect(cursorNote(s.score, s.cursor)?.effects.tap).toBeUndefined();
+  });
+
   it('ties to the previous note on the same string and copies its fret', () => {
     const s = run(fresh(), [digit(5), { type: 'moveBeat', delta: 1 }, digit(7), { type: 'tie' }]);
     expect(cursorNote(s.score, s.cursor)).toMatchObject({ tieFromPrev: true, fret: 5 });

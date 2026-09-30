@@ -26,6 +26,7 @@ const EFFECT_KEYS: Record<string, Command> = {
   m: { type: 'palmMute' },
   x: { type: 'dead' },
   l: { type: 'letRing' },
+  n: { type: 'harmonic' },
   r: { type: 'rest' },
 };
 
@@ -186,6 +187,14 @@ export function mapKey(e: KeyLike, ctx: KeyContext = GUITAR): KeyResult {
       return { shell: 'help' };
     case 'Escape':
       return { shell: 'escape' };
+  }
+  // Shift+T: tapping (T alone is the tie).
+  if (lower === 't' && e.shiftKey) {
+    return { command: { type: 'tap' } };
+  }
+  // Shift+R: tremolo picking (R alone is the rest).
+  if (lower === 'r' && e.shiftKey) {
+    return { command: { type: 'tremolo' } };
   }
   const effect = EFFECT_KEYS[lower];
   return effect && !e.shiftKey ? { command: effect } : null;

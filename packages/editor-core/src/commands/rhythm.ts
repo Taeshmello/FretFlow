@@ -67,6 +67,21 @@ export function setDuration(score: Score, cursor: Cursor, selection: Selection |
   return mapDuration(score, cursor, selection, 'set duration', d => ({ ...d, base }));
 }
 
+const TREMOLOS: (Beat['tremolo'])[] = [undefined, 8, 16, 32];
+
+/**
+ * `Shift+R`: tremolo picking none → eighths → sixteenths → thirty-seconds → none, or
+ * exactly `speed` (null = off) from the panel. Rests are skipped.
+ */
+export function cycleTremolo(score: Score, cursor: Cursor, selection: Selection | null, speed?: Beat['tremolo'] | null): Change | null {
+  const beats = targets(score, cursor, selection).filter(b => !b.rest);
+  if (!beats.length) {
+    return null;
+  }
+  const next = speed !== undefined ? (speed ?? undefined) : TREMOLOS[(TREMOLOS.indexOf(beats[0].tremolo) + 1) % TREMOLOS.length];
+  return { ops: beats.map(b => setOp(score, b.id, ['tremolo'], next)), label: 'tremolo' };
+}
+
 /** `R`: rest on → notes are removed; rest off → an empty beat ready for input. */
 export function toggleRest(score: Score, cursor: Cursor, selection: Selection | null): Change | null {
   const beats = targets(score, cursor, selection);

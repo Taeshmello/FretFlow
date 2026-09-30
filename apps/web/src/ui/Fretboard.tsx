@@ -103,7 +103,7 @@ export function KeyboardHints({ onAll }: { onAll: () => void }) {
         <b>+ −</b> duration · <b>.</b> dotted · <b>R</b> rest
       </p>
       <p>
-        <b>H P S B V M X L</b> techniques
+        <b>H P S B V M X L N ⇧T ⇧R</b> techniques
       </p>
       <p>
         <button type="button" className="link" onClick={onAll}>

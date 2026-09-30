@@ -1,5 +1,5 @@
 import { cursorBeat, cursorTrack, type Command, type EditorState } from '@fretflow/editor-core';
-import { isFretted, pitchName, type DurationBase } from '@fretflow/score-model';
+import { isFretted, pitchName, type BendAmount, type DurationBase, type HarmonicKind } from '@fretflow/score-model';
 import { DrumPad } from '../../ui/DrumPad';
 import { PianoKeyboard } from '../../ui/PianoKeyboard';
 import { useMemo, useState } from 'react';
@@ -18,6 +18,9 @@ const DURATIONS: { value: DurationBase; label: string }[] = [
   { value: 8, label: '⅛' }, { value: 16, label: '1/16' }, { value: 32, label: '1/32' },
 ];
 
+const BEND_AMOUNTS: [BendAmount, string][] = [[0.5, '½'], [1, 'full'], [1.5, '1½'], [2, '2']];
+const HARMONIC_KINDS: [HarmonicKind, string][] = [['natural', 'N.H.'], ['artificial', 'A.H.'], ['pinch', 'P.H.'], ['tap', 'T.H.'], ['semi', 'S.H.'], ['feedback', 'Fdbk']];
+
 const TECHNIQUES: { label: string; command: Command }[] = [
   { label: 'h/p', command: { type: 'hammer' } },
   { label: 'slide', command: { type: 'slide' } },
@@ -25,6 +28,8 @@ const TECHNIQUES: { label: string; command: Command }[] = [
   { label: 'vib', command: { type: 'vibrato' } },
   { label: 'PM', command: { type: 'palmMute' } },
   { label: 'x', command: { type: 'dead' } },
+  { label: 'tap', command: { type: 'tap' } },
+  { label: 'harm', command: { type: 'harmonic' } },
   { label: 'tie', command: { type: 'tie' } },
 ];
 
@@ -79,8 +84,27 @@ export function TouchInput({ editor, dispatch, octave, onOctave }: Props) {
       {fretted && <>
       <div className="touch-strip" role="group" aria-label="Technique">
         {TECHNIQUES.map(t => <button key={t.label} type="button" onClick={() => dispatch(t.command)}>{t.label}</button>)}
+        <button type="button" aria-pressed={!!beat?.tremolo} disabled={!beat || beat.rest} onClick={() => dispatch({ type: 'tremolo' })}>{beat?.tremolo ? `trem 1/${beat.tremolo}` : 'trem'}</button>
         <button type="button" aria-pressed={!!beat?.rest} onClick={() => dispatch({ type: 'rest' })}>Rest</button>
       </div>
+      {note?.effects.bend && (
+        <div className="touch-strip" role="group" aria-label="Bend amount">
+          {BEND_AMOUNTS.map(([amount, label]) => (
+            <button key={amount} type="button" aria-pressed={note.effects.bend?.amount === amount} onClick={() => dispatch({ type: 'setEffect', key: 'bend', value: { type: note.effects.bend?.type ?? 'bend', amount } })}>
+              bend {label}
+            </button>
+          ))}
+        </div>
+      )}
+      {note?.effects.harmonic && (
+        <div className="touch-strip" role="group" aria-label="Harmonic">
+          {HARMONIC_KINDS.map(([kind, label]) => (
+            <button key={kind} type="button" aria-pressed={note.effects.harmonic === kind} onClick={() => dispatch({ type: 'setEffect', key: 'harmonic', value: kind })}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="touch-strings" role="group" aria-label="String">
         {track.tuning.map((pitch, i) => <button key={i} type="button" aria-pressed={editor.cursor.string === i + 1} onClick={() => dispatch({ type: 'setCursor', cursor: { ...editor.cursor, string: i + 1 } })}>{i + 1} {pitchName(pitch + track.capo).replace(/-?\d+$/, '')}</button>)}
       </div>

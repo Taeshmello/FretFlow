@@ -81,6 +81,11 @@ describe('validateScore for piano and drums', () => {
     expect(withBeat('piano', b => (b.hits = [createDrumHit('kick')]))).toContain('wrongNoteKind');
   });
 
+  it('accepts tremolo picking of eighths, sixteenths or thirty-seconds only', () => {
+    expect(withBeat('guitar', b => (b.tremolo = 16))).toEqual([]);
+    expect(withBeat('guitar', b => ((b as { tremolo?: number }).tremolo = 4))).toContain('tremolo');
+  });
+
   it('allows the sustain pedal on piano tracks only', () => {
     expect(withBeat('piano', b => (b.pedal = 'down'))).toEqual([]);
     expect(withBeat('guitar', b => (b.pedal = 'down'))).toContain('pedal');

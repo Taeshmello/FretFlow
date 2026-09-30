@@ -1,5 +1,6 @@
 import * as alphaTab from '@coderline/alphatab';
 import { convertDuration, liveBeats, Report } from './importCommon';
+import { convertEffects } from './importEffects';
 import { drumBar, pianoBar } from './importPitched';
 import {
   createBar,
@@ -8,10 +9,8 @@ import {
   pitchOf,
   type Bar,
   type Beat,
-  type BendAmount,
   type MasterBar,
   type Note,
-  type NoteEffects,
   type Score,
   type Track,
 } from '@fretflow/score-model';
@@ -25,91 +24,6 @@ export interface ImportResult {
   score: Score;
   /** Human-readable element name → how many were dropped or simplified. */
   unsupported: Map<string, number>;
-}
-
-function bendAmount(points: readonly alphaTab.model.BendPoint[] | null): BendAmount {
-  const max = Math.max(0, ...(points ?? []).map(p => p.value));
-  const half = Math.round(max / 2) / 2;
-  return Math.min(2, Math.max(0.5, half)) as BendAmount;
-}
-
-function convertEffects(n: alphaTab.model.Note, report: Report): NoteEffects {
-  const fx: NoteEffects = {};
-  if (n.isHammerPullOrigin) {
-    fx.hammerPull = true;
-  }
-  switch (n.slideOutType) {
-    case at.SlideOutType.None:
-      break;
-    case at.SlideOutType.Legato:
-      fx.slide = 'legato';
-      break;
-    case at.SlideOutType.Shift:
-      fx.slide = 'shift';
-      break;
-    case at.SlideOutType.OutDown:
-    case at.SlideOutType.OutUp:
-      fx.slide = 'out';
-      break;
-    default:
-      report.add('pick slides');
-  }
-  if (!fx.slide && n.slideInType !== at.SlideInType.None) {
-    fx.slide = 'in';
-  }
-  if (n.hasBend) {
-    const amount = bendAmount(n.bendPoints);
-    switch (n.bendType) {
-      case at.BendType.Bend:
-      case at.BendType.Custom:
-        fx.bend = { type: 'bend', amount };
-        break;
-      case at.BendType.Release:
-        fx.bend = { type: 'release', amount };
-        break;
-      case at.BendType.BendRelease:
-        fx.bend = { type: 'bendRelease', amount };
-        break;
-      case at.BendType.Prebend:
-      case at.BendType.PrebendBend:
-      case at.BendType.PrebendRelease:
-        fx.bend = { type: 'prebend', amount };
-        break;
-      default:
-        fx.bend = { type: 'bend', amount };
-    }
-  }
-  if (n.vibrato !== at.VibratoType.None) {
-    fx.vibrato = n.vibrato === at.VibratoType.Wide ? 'wide' : 'slight';
-  }
-  if (n.isPalmMute) {
-    fx.palmMute = true;
-  }
-  if (n.isDead) {
-    fx.dead = true;
-  }
-  if (n.isLetRing) {
-    fx.letRing = true;
-  }
-  if (n.harmonicType !== at.HarmonicType.None) {
-    report.add('harmonics');
-  }
-  if (n.isTrill) {
-    report.add('trills');
-  }
-  if (n.isGhost) {
-    report.add('ghost notes');
-  }
-  if (n.accentuated !== at.AccentuationType.None) {
-    report.add('accents');
-  }
-  if (n.isStaccato) {
-    report.add('staccato');
-  }
-  if (n.isLeftHandTapped) {
-    report.add('tapping');
-  }
-  return fx;
 }
 
 function convertBeat(beat: alphaTab.model.Beat, track: Track, report: Report): Beat {
@@ -127,11 +41,15 @@ function convertBeat(beat: alphaTab.model.Beat, track: Track, report: Report): B
   if (beat.graceType !== at.GraceType.None) {
     report.add('grace notes');
   }
-  if (beat.isTremolo) {
-    report.add('tremolo picking');
+  const marks = beat.tremoloPicking?.marks ?? 0;
+  if (marks > 0) {
+    out.tremolo = marks === 1 ? 8 : marks === 2 ? 16 : 32;
+    if (marks > 3) {
+      report.add('tremolo faster than thirty-seconds (set to thirty-seconds)');
+    }
   }
-  if (beat.tap || beat.slap || beat.pop) {
-    report.add('tap/slap/pop');
+  if (beat.slap || beat.pop) {
+    report.add('slap/pop');
   }
   const seen = new Set<number>();
   for (const n of beat.notes) {

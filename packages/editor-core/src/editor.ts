@@ -1,4 +1,4 @@
-import { applyOps, findBeat, invert, isFretted, newId, setOp, type Duration, type DrumPiece, type Id, type Op, type Instrument, type NoteEffects, type Score } from '@fretflow/score-model';
+import { applyOps, findBeat, invert, isFretted, newId, setOp, type Duration, type DrumPiece, type Id, type Op, type Instrument, type NoteEffects, type Score, type TremoloSpeed } from '@fretflow/score-model';
 import { clampCursor, cursorNote, initialCursor, moveBar, moveString, type Cursor, type Selection } from './cursor';
 import { DEFAULT_SETTINGS, type Change, type Settings } from './change';
 import { emptyHistory, popRedo, popUndo, record, type History } from './history';
@@ -67,7 +67,7 @@ export function createEditor(score: Score, settings: Partial<Settings> = {}): Ed
   };
 }
 
-export type EffectKey = 'hammerPull' | 'palmMute' | 'dead' | 'letRing' | 'vibrato' | 'slide' | 'bend';
+export type EffectKey = 'hammerPull' | 'palmMute' | 'dead' | 'letRing' | 'tap' | 'harmonic' | 'vibrato' | 'slide' | 'bend';
 
 export type Command =
   | { type: 'digit'; digit: number }
@@ -100,6 +100,9 @@ export type Command =
   | { type: 'palmMute' }
   | { type: 'dead' }
   | { type: 'letRing' }
+  | { type: 'tap' }
+  | { type: 'harmonic' }
+  | { type: 'tremolo'; speed?: TremoloSpeed | null }
   | { type: 'setEffect'; key: EffectKey; value: NoteEffects[EffectKey] }
   | { type: 'insertBar'; after: boolean }
   | { type: 'deleteBar' }
@@ -267,6 +270,12 @@ function run(state: EditorState, command: Command, now: number, mergeField: bool
       return commit(base, fx.toggleDead(score, cursor, selection), now);
     case 'letRing':
       return commit(base, fx.toggleLetRing(score, cursor, selection), now);
+    case 'tap':
+      return commit(base, fx.toggleTap(score, cursor, selection), now);
+    case 'harmonic':
+      return commit(base, fx.cycleHarmonic(score, cursor, selection), now);
+    case 'tremolo':
+      return commit(base, rhythm.cycleTremolo(score, cursor, selection, command.speed), now);
     case 'setEffect':
       return commit(base, fx.setEffect(score, cursor, selection, command.key, command.value), now);
     case 'insertBar':

@@ -64,6 +64,24 @@ function bendPoints(bend: NonNullable<NoteEffects['bend']>): { type: alphaTab.mo
   }
 }
 
+const HARMONIC_TYPES: Record<NonNullable<NoteEffects['harmonic']>, alphaTab.model.HarmonicType> = {
+  natural: at.HarmonicType.Natural,
+  artificial: at.HarmonicType.Artificial,
+  pinch: at.HarmonicType.Pinch,
+  tap: at.HarmonicType.Tap,
+  semi: at.HarmonicType.Semi,
+  feedback: at.HarmonicType.Feedback,
+};
+
+/** alphaTab's harmonic value for a natural harmonic touched at `fret` (ModelUtils.deltaFretToHarmonicValue, not exported). */
+function naturalHarmonicValue(fret: number): number {
+  const exact = [4, 5, 7, 9, 12, 16, 17, 19, 24];
+  if (exact.includes(fret)) {
+    return fret;
+  }
+  return { 2: 2.4, 3: 3.2, 8: 8.2, 10: 9.6, 14: 14.7, 15: 14.7, 21: 21.7, 22: 21.7 }[fret] ?? 12;
+}
+
 function convertNote(note: Note, stringCount: number): alphaTab.model.Note {
   const n = new at.Note();
   n.string = toAlphaTabString(note.string, stringCount);
@@ -86,6 +104,10 @@ function convertNote(note: Note, stringCount: number): alphaTab.model.Note {
   n.isPalmMute = fx.palmMute === true;
   n.isDead = fx.dead === true;
   n.isLetRing = fx.letRing === true;
+  if (fx.harmonic) {
+    n.harmonicType = HARMONIC_TYPES[fx.harmonic];
+    n.harmonicValue = fx.harmonic === 'natural' ? naturalHarmonicValue(note.fret) : 12;
+  }
   return n;
 }
 
@@ -107,6 +129,14 @@ function convertBeat(beat: Beat, stringCount: number): alphaTab.model.Beat {
   if (!beat.rest) {
     for (const note of beat.notes) {
       b.addNote(convertNote(note, stringCount));
+    }
+    // alphaTab (like Guitar Pro) marks tapping on the beat.
+    b.tap = beat.notes.some(n => n.effects.tap === true);
+    if (beat.tremolo) {
+      // One mark per beam: eighths 1, sixteenths 2, thirty-seconds 3.
+      const tremolo = new at.TremoloPickingEffect();
+      tremolo.marks = Math.log2(beat.tremolo) - 2;
+      b.tremoloPicking = tremolo;
     }
   }
   return b;

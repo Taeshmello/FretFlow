@@ -23,6 +23,7 @@ export interface ValidationIssue {
     | 'drumPiece'
     | 'wrongNoteKind'
     | 'pedal'
+    | 'tremolo'
     | 'duration'
     | 'timeSig'
     | 'keySig'
@@ -99,6 +100,9 @@ export function validateScore(score: Score): ValidationIssue[] {
         }
         if (beat.pedal !== undefined && (track.instrument !== 'piano' || (beat.pedal !== 'down' && beat.pedal !== 'up'))) {
           issues.push({ code: 'pedal', message: `pedal ${String(beat.pedal)} on a ${track.instrument} track`, id: beat.id });
+        }
+        if (beat.tremolo !== undefined && beat.tremolo !== 8 && beat.tremolo !== 16 && beat.tremolo !== 32) {
+          issues.push({ code: 'tremolo', message: `tremolo ${String(beat.tremolo)} is not 8, 16 or 32`, id: beat.id });
         }
         const pitches = new Set<number>();
         for (const key of keys) {

@@ -1422,6 +1422,18 @@ kbd {
   color: var(--muted);
 }
 
+.bend-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.bend-row .muted {
+  min-width: 34px;
+}
+
 .tech-detail {
   display: grid;
   gap: 8px;

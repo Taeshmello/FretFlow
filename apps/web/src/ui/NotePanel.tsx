@@ -1,5 +1,5 @@
 import { cursorBeat, cursorNote, cursorTrack, type Command, type EditorState } from '@fretflow/editor-core';
-import { DRUM_PIECES, fretFor, isFretted, pitchName, type BendAmount, type BendType, type DurationBase, type NoteEffects } from '@fretflow/score-model';
+import { DRUM_PIECES, fretFor, isFretted, pitchName, type BendAmount, type BendType, type DurationBase, type HarmonicKind, type NoteEffects, type TremoloSpeed } from '@fretflow/score-model';
 import { Lock, LockOpen } from 'lucide-react';
 import { nameChord } from './chordName';
 
@@ -28,6 +28,38 @@ const TECHNIQUES: Tech[] = [
   { key: 'M', label: 'Palm mute', command: { type: 'palmMute' }, on: fx => !!fx.palmMute },
   { key: 'X', label: 'Dead note', command: { type: 'dead' }, on: fx => !!fx.dead },
   { key: 'L', label: 'Let ring', command: { type: 'letRing' }, on: fx => !!fx.letRing },
+  { key: 'N', label: 'Harmonic', command: { type: 'harmonic' }, on: fx => !!fx.harmonic },
+  { key: '⇧T', label: 'Tapping', command: { type: 'tap' }, on: fx => !!fx.tap },
+];
+
+const TREMOLOS: { speed: TremoloSpeed | undefined; label: string }[] = [
+  { speed: undefined, label: 'Off' },
+  { speed: 8, label: '1/8' },
+  { speed: 16, label: '1/16' },
+  { speed: 32, label: '1/32' },
+];
+
+/** Harmonic kinds with the abbreviations printed on the score. */
+const HARMONIC_KINDS: { kind: HarmonicKind; label: string; name: string }[] = [
+  { kind: 'natural', label: 'N.H.', name: 'Natural harmonic (touched at this fret)' },
+  { kind: 'artificial', label: 'A.H.', name: 'Artificial harmonic (an octave above the fretted note)' },
+  { kind: 'pinch', label: 'P.H.', name: 'Pinch harmonic' },
+  { kind: 'tap', label: 'T.H.', name: 'Tapped harmonic' },
+  { kind: 'semi', label: 'S.H.', name: 'Semi harmonic' },
+  { kind: 'feedback', label: 'Fdbk', name: 'Feedback' },
+];
+
+const BEND_AMOUNTS: { amount: BendAmount; label: string }[] = [
+  { amount: 0.5, label: '½' },
+  { amount: 1, label: 'Full' },
+  { amount: 1.5, label: '1½' },
+  { amount: 2, label: '2' },
+];
+const BEND_TYPES: { type: BendType; label: string }[] = [
+  { type: 'bend', label: 'Bend' },
+  { type: 'release', label: 'Release' },
+  { type: 'bendRelease', label: 'Bend + release' },
+  { type: 'prebend', label: 'Pre-bend' },
 ];
 
 export function NotePanel({ editor, dispatch }: Props) {
@@ -59,7 +91,7 @@ export function NotePanel({ editor, dispatch }: Props) {
         .map(s => ({ string: s, fret: fretFor(track, s, note.pitch) }))
         .filter((x): x is { string: number; fret: number } => x.fret !== null)
     : [];
-  const setFx = (key: 'bend' | 'slide' | 'vibrato', value: NoteEffects[typeof key]) => dispatch({ type: 'setEffect', key, value });
+  const setFx = (key: 'bend' | 'slide' | 'vibrato' | 'harmonic', value: NoteEffects[typeof key]) => dispatch({ type: 'setEffect', key, value });
 
   return (
     <aside className="note-panel card" aria-label="Selected note">
@@ -189,24 +221,66 @@ export function NotePanel({ editor, dispatch }: Props) {
             </button>
           ))}
         </div>
-        {note && (fx.bend || fx.slide || fx.vibrato) && (
+        {note && (
+          <div className="bend-row" role="group" aria-label="Bend amount">
+            <span className="muted small">Bend</span>
+            <button type="button" className="chip" aria-pressed={!fx.bend} onClick={() => setFx('bend', undefined)}>
+              Off
+            </button>
+            {BEND_AMOUNTS.map(({ amount, label }) => (
+              <button
+                key={amount}
+                type="button"
+                className="chip"
+                aria-pressed={fx.bend?.amount === amount}
+                title={`Bend ${label} = ${amount * 2} semitone${amount === 0.5 ? '' : 's'}`}
+                onClick={() => setFx('bend', { type: fx.bend?.type ?? 'bend', amount })}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+        {note && (
+          <div className="bend-row" role="group" aria-label="Harmonic">
+            <span className="muted small">Harm.</span>
+            <button type="button" className="chip" aria-pressed={!fx.harmonic} onClick={() => setFx('harmonic', undefined)}>
+              Off
+            </button>
+            {HARMONIC_KINDS.map(({ kind, label, name }) => (
+              <button key={kind} type="button" className="chip" aria-pressed={fx.harmonic === kind} title={name} onClick={() => setFx('harmonic', kind)}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+        {beat && !beat.rest && (
+          <div className="bend-row" role="group" aria-label="Tremolo picking">
+            <span className="muted small" title="Tremolo picking (Shift+R)">Trem.</span>
+            {TREMOLOS.map(({ speed, label }) => (
+              <button
+                key={label}
+                type="button"
+                className="chip"
+                aria-pressed={beat.tremolo === speed}
+                onClick={() => dispatch({ type: 'tremolo', speed: speed ?? null })}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+        {note && fx.bend && (
+          <div className="bend-row" role="group" aria-label="Bend type">
+            {BEND_TYPES.map(({ type, label }) => (
+              <button key={type} type="button" className="chip" aria-pressed={fx.bend?.type === type} onClick={() => fx.bend && setFx('bend', { ...fx.bend, type })}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+        {note && (fx.slide || fx.vibrato) && (
           <div className="tech-detail">
-            {fx.bend && (
-              <>
-                <select aria-label="Bend type" value={fx.bend.type} onChange={e => setFx('bend', { type: e.target.value as BendType, amount: fx.bend?.amount ?? 1 })}>
-                  <option value="bend">Bend</option>
-                  <option value="release">Release</option>
-                  <option value="bendRelease">Bend + release</option>
-                  <option value="prebend">Pre-bend</option>
-                </select>
-                <select aria-label="Bend amount" value={fx.bend.amount} onChange={e => fx.bend && setFx('bend', { ...fx.bend, amount: Number(e.target.value) as BendAmount })}>
-                  <option value={0.5}>½</option>
-                  <option value={1}>Full</option>
-                  <option value={1.5}>1½</option>
-                  <option value={2}>2</option>
-                </select>
-              </>
-            )}
             {fx.slide && (
               <select aria-label="Slide type" value={fx.slide} onChange={e => setFx('slide', e.target.value as NoteEffects['slide'])}>
                 <option value="legato">Legato slide</option>

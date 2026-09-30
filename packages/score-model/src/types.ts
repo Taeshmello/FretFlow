@@ -71,6 +71,8 @@ export interface Beat {
    * it is already down), 'up' releases it. Only on piano tracks.
    */
   pedal?: Pedal;
+  /** Tremolo picking: the beat is re-picked in notes of this length. */
+  tremolo?: TremoloSpeed;
   /** User-authored chord symbol shown above the stave, e.g. Am7 or G/B. */
   chord?: string;
   /** Syllable or short lyric phrase attached to this beat. */
@@ -79,6 +81,10 @@ export interface Beat {
 }
 
 export type Pedal = 'down' | 'up';
+
+export type TremoloSpeed = 8 | 16 | 32;
+
+export type HarmonicKind = 'natural' | 'artificial' | 'pinch' | 'tap' | 'semi' | 'feedback';
 
 export type NoteSource = 'user' | 'import' | 'ai';
 
@@ -140,6 +146,10 @@ export interface NoteEffects {
   palmMute?: boolean;
   dead?: boolean;
   letRing?: boolean;
+  /** Tapped with the picking hand (drawn as T above the beat). */
+  tap?: boolean;
+  /** Natural: touched at this fret. The others sound an octave (12 frets) above the fretted note. */
+  harmonic?: HarmonicKind;
   /** Unknown keys are preserved. */
   [k: string]: unknown;
 }

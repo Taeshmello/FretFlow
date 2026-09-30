@@ -25,6 +25,11 @@ describe('mapKey (SPEC §5.2)', () => {
 
   it('maps technique letters regardless of case lock but not with Shift', () => {
     expect(mapKey(k('b'))).toEqual({ command: { type: 'bend' } });
+    expect(mapKey(k('T', { shiftKey: true }))).toEqual({ command: { type: 'tap' } });
+    expect(mapKey(k('n'))).toEqual({ command: { type: 'harmonic' } });
+    expect(mapKey(k('R', { shiftKey: true }))).toEqual({ command: { type: 'tremolo' } });
+    expect(mapKey(k('r'))).toEqual({ command: { type: 'rest' } });
+    expect(mapKey(k('t'))).toEqual({ command: { type: 'tie' } });
     expect(mapKey(k('M'))).toEqual({ command: { type: 'palmMute' } });
     expect(mapKey(k('H', { shiftKey: true }))).toBeNull();
   });

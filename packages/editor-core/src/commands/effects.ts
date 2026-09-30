@@ -2,7 +2,7 @@ import { setOp, type NoteEffects, type Op, type Score } from '@fretflow/score-mo
 import { beatsInRange, cursorNote, selectionRange, type Cursor, type Selection } from '../cursor';
 import type { Change } from '../change';
 
-type EffectKey = 'hammerPull' | 'palmMute' | 'dead' | 'letRing' | 'vibrato' | 'slide' | 'bend';
+type EffectKey = 'hammerPull' | 'palmMute' | 'dead' | 'letRing' | 'tap' | 'harmonic' | 'vibrato' | 'slide' | 'bend';
 
 /** Notes an effect applies to: every note in the selection's string range, or the cursor note. */
 function targetNotes(score: Score, cursor: Cursor, selection: Selection | null) {
@@ -39,6 +39,7 @@ export const toggleHammer = (s: Score, c: Cursor, sel: Selection | null) => cycl
 export const togglePalmMute = (s: Score, c: Cursor, sel: Selection | null) => cycleEffect(s, c, sel, 'palmMute', toggle);
 export const toggleDead = (s: Score, c: Cursor, sel: Selection | null) => cycleEffect(s, c, sel, 'dead', toggle);
 export const toggleLetRing = (s: Score, c: Cursor, sel: Selection | null) => cycleEffect(s, c, sel, 'letRing', toggle);
+export const toggleTap = (s: Score, c: Cursor, sel: Selection | null) => cycleEffect(s, c, sel, 'tap', toggle);
 export const toggleVibrato = (s: Score, c: Cursor, sel: Selection | null) =>
   cycleEffect(s, c, sel, 'vibrato', v => (v ? undefined : 'slight'));
 
@@ -46,6 +47,11 @@ const SLIDES: (NoteEffects['slide'])[] = [undefined, 'legato', 'shift', 'in', 'o
 /** `S`: none → legato → shift → in → out → none. */
 export const cycleSlide = (s: Score, c: Cursor, sel: Selection | null) =>
   cycleEffect(s, c, sel, 'slide', v => SLIDES[(SLIDES.indexOf(v) + 1) % SLIDES.length]);
+
+const HARMONICS: (NoteEffects['harmonic'])[] = [undefined, 'natural', 'artificial', 'pinch'];
+/** `N`: none → natural → artificial → pinch → none (tapped, semi and feedback from the panel). */
+export const cycleHarmonic = (s: Score, c: Cursor, sel: Selection | null) =>
+  cycleEffect(s, c, sel, 'harmonic', v => HARMONICS[(HARMONICS.indexOf(v) + 1) % HARMONICS.length]);
 
 type Bend = NoteEffects['bend'];
 const BENDS: Bend[] = [undefined, { type: 'bend', amount: 1 }, { type: 'bend', amount: 0.5 }, { type: 'release', amount: 1 }];

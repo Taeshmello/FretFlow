@@ -14,10 +14,11 @@ function riff(): Score {
   b0.notes = [createNote(track, 6, 0), createNote(track, 5, 2)].sort((a, b) => a.string - b.string);
   b1.rest = false;
   b1.duration = { base: 8, dots: 1 };
-  b1.notes = [{ ...createNote(track, 3, 7), effects: { bend: { type: 'bend', amount: 1 }, vibrato: 'wide' } }];
+  b1.tremolo = 32;
+  b1.notes = [{ ...createNote(track, 3, 7), effects: { bend: { type: 'bend', amount: 1.5 }, vibrato: 'wide', tap: true } }];
   b2.rest = false;
   b2.duration = { base: 8, dots: 0, tuplet: [3, 2] };
-  b2.notes = [{ ...createNote(track, 1, 5), effects: { hammerPull: true, palmMute: true, slide: 'legato', letRing: true } }];
+  b2.notes = [{ ...createNote(track, 1, 5), effects: { hammerPull: true, palmMute: true, slide: 'legato', letRing: true, harmonic: 'artificial' } }];
   const tied = track.bars[1].beats[0];
   tied.rest = false;
   tied.notes = [{ ...createNote(track, 1, 5), tieFromPrev: true, effects: { dead: false } }];
@@ -36,6 +37,7 @@ function music(score: Score) {
         b.beats.map(beat => ({
           duration: beat.duration,
           rest: beat.rest,
+          tremolo: beat.tremolo,
           notes: beat.notes.map(n => ({ string: n.string, fret: n.fret, pitch: n.pitch, tie: n.tieFromPrev ?? false, fx: Object.fromEntries(Object.entries(n.effects).filter(([, v]) => v)) })),
         })),
       ),
@@ -86,6 +88,36 @@ describe('toAlphaTab', () => {
     expect(beat.chord?.name).toBe('Am7');
     expect(beat.chord?.showName).toBe(true);
     expect(beat.chord?.showDiagram).toBe(false);
+  });
+
+  it('writes natural harmonics at the touched fret and artificial ones an octave up', () => {
+    const score = createScore({ bars: 1 });
+    const track = score.tracks[0];
+    const [b0, b1] = track.bars[0].beats;
+    b0.rest = false;
+    b0.notes = [{ ...createNote(track, 3, 7), effects: { harmonic: 'natural' } }];
+    b1.rest = false;
+    b1.notes = [{ ...createNote(track, 2, 5), effects: { harmonic: 'pinch' } }];
+    const { score: model } = toAlphaTab(score, { staffMode: 'scoreTab' }, new alphaTab.Settings());
+    const [n0, n1] = model.tracks[0].staves[0].bars[0].voices[0].beats.map(b => b.notes[0]);
+    expect([n0.harmonicType, n0.harmonicValue]).toEqual([alphaTab.model.HarmonicType.Natural, 7]);
+    expect([n1.harmonicType, n1.harmonicValue]).toEqual([alphaTab.model.HarmonicType.Pinch, 12]);
+    const back = importFile(exportGp7(score)).score.tracks[0].bars[0].beats.map(b => b.notes[0]?.effects.harmonic);
+    expect(back.slice(0, 2)).toEqual(['natural', 'pinch']);
+  });
+
+  it('writes tremolo picking as marks on the beat', () => {
+    const { score } = toAlphaTab(riff(), { staffMode: 'scoreTab' }, new alphaTab.Settings());
+    const [b0, b1] = score.tracks[0].staves[0].bars[0].voices[0].beats;
+    expect(b0.isTremolo).toBe(false);
+    expect(b1.tremoloPicking?.marks).toBe(3);
+  });
+
+  it('draws tapping as a tapped beat', () => {
+    const { score } = toAlphaTab(riff(), { staffMode: 'scoreTab' }, new alphaTab.Settings());
+    const [b0, b1] = score.tracks[0].staves[0].bars[0].voices[0].beats;
+    expect(b0.tap).toBe(false);
+    expect(b1.tap).toBe(true);
   });
 
   it('puts our string 6 (low E) on alphaTab string 1', () => {
