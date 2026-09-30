@@ -1,19 +1,14 @@
 import * as alphaTab from '@coderline/alphatab';
-import { importPedals } from './pedal';
+import { convertDuration, liveBeats, Report } from './importCommon';
+import { drumBar, pianoBar } from './importPitched';
 import {
   createBar,
-  DRUM_ORDER,
-  drumPieceForMidi,
-  PIANO_HIGH,
-  PIANO_LOW,
   DEFAULT_MAX_FRET,
   newId,
   pitchOf,
   type Bar,
   type Beat,
   type BendAmount,
-  type DrumPiece,
-  type Duration,
   type MasterBar,
   type Note,
   type NoteEffects,
@@ -30,36 +25,6 @@ export interface ImportResult {
   score: Score;
   /** Human-readable element name → how many were dropped or simplified. */
   unsupported: Map<string, number>;
-}
-
-class Report {
-  readonly items = new Map<string, number>();
-  add(what: string, n = 1): void {
-    this.items.set(what, (this.items.get(what) ?? 0) + n);
-  }
-}
-
-const BASES: readonly Duration['base'][] = [1, 2, 4, 8, 16, 32];
-
-function convertDuration(beat: alphaTab.model.Beat, report: Report): Duration {
-  let base = beat.duration as number;
-  if (base < 1) {
-    report.add('double/quadruple whole notes (shortened to whole)');
-    base = 1;
-  }
-  if (base > 32) {
-    report.add('64th and shorter notes (lengthened to 32nd)');
-    base = 32;
-  }
-  const d: Duration = { base: (BASES.includes(base as Duration['base']) ? base : 4) as Duration['base'], dots: Math.min(beat.dots, 2) as Duration['dots'] };
-  if (beat.hasTuplet) {
-    if (beat.tupletNumerator === 3 && beat.tupletDenominator === 2) {
-      d.tuplet = [3, 2];
-    } else {
-      report.add(`tuplets other than triplets (${beat.tupletNumerator}:${beat.tupletDenominator})`);
-    }
-  }
-  return d;
 }
 
 function bendAmount(points: readonly alphaTab.model.BendPoint[] | null): BendAmount {
@@ -250,84 +215,6 @@ function kindOf(t: alphaTab.model.Track): Kind {
     return 'drums';
   }
   return staff?.isStringed ? 'fretted' : 'piano';
-}
-
-/** Beats of one bar with just the duration and text fields (no notes yet). */
-function bareBeat(b: alphaTab.model.Beat, report: Report): Beat {
-  const out: Beat = { id: newId(), duration: convertDuration(b, report), rest: true, notes: [] };
-  if (b.lyrics?.[0]) {
-    out.lyric = b.lyrics[0];
-  }
-  if (b.chord?.name) {
-    out.chord = b.chord.name;
-  }
-  if (b.text) {
-    out.text = b.text;
-  }
-  return out;
-}
-
-const sameRhythm = (a: alphaTab.model.Beat[], b: alphaTab.model.Beat[]) =>
-  a.length === b.length && a.every((x, i) => x.duration === b[i].duration && x.dots === b[i].dots && x.tupletNumerator === b[i].tupletNumerator);
-
-const liveBeats = (bar: alphaTab.model.Bar | undefined) => (bar?.voices[0]?.beats ?? []).filter(b => !b.isEmpty);
-
-/** Piano: keys from every staff of a bar when their rhythm lines up; otherwise the top staff only. */
-function pianoBar(t: alphaTab.model.Track, i: number, mb: MasterBar, report: Report): Bar {
-  const top = liveBeats(t.staves[0]?.bars[i]);
-  if (!top.length) {
-    return createBar(mb);
-  }
-  const others = t.staves.slice(1).map(st => liveBeats(st.bars[i]));
-  const merged = others.filter(o => o.length && sameRhythm(top, o));
-  if (others.some(o => o.length && !sameRhythm(top, o))) {
-    report.add('piano staves with a different rhythm (top staff kept)');
-  }
-  const beats = top.map((b, bi) => {
-    const out = bareBeat(b, report);
-    const pitches = new Set<number>();
-    for (const n of [...b.notes, ...merged.flatMap(o => o[bi].notes)]) {
-      const pitch = n.realValue;
-      if (pitch < PIANO_LOW || pitch > PIANO_HIGH || pitches.has(pitch)) {
-        continue;
-      }
-      pitches.add(pitch);
-      out.keys ??= [];
-      out.keys.push({ id: newId(), pitch, source: 'import', ...(n.isTieDestination ? { tieFromPrev: true } : {}) });
-    }
-    out.keys?.sort((a, c) => a.pitch - c.pitch);
-    out.rest = !out.keys?.length;
-    return out;
-  });
-  importPedals(t, i, top, beats);
-  return { id: newId(), masterBarId: mb.id, beats };
-}
-
-/** Drums: GM percussion numbers (or the track's own articulation list) → kit pieces. */
-function drumBar(t: alphaTab.model.Track, i: number, mb: MasterBar, report: Report): Bar {
-  const beats = liveBeats(t.staves[0]?.bars[i]).map(b => {
-    const out = bareBeat(b, report);
-    const seen = new Set<DrumPiece>();
-    for (const n of b.notes) {
-      const listed = t.percussionArticulations[n.percussionArticulation];
-      const midi = listed ? listed.outputMidiNumber : n.percussionArticulation;
-      const piece = drumPieceForMidi(midi);
-      if (!piece) {
-        report.add('drum sounds without a FretFlow kit piece');
-        continue;
-      }
-      if (!seen.has(piece)) {
-        seen.add(piece);
-        out.hits ??= [];
-        const dynamic = n.isGhost ? 'ghost' : n.accentuated !== at.AccentuationType.None ? 'accent' : undefined;
-        out.hits.push({ id: newId(), piece, source: 'import', ...(dynamic ? { dynamic } : {}) });
-      }
-    }
-    out.hits?.sort((a, c) => DRUM_ORDER.indexOf(a.piece) - DRUM_ORDER.indexOf(c.piece));
-    out.rest = !out.hits?.length;
-    return out;
-  });
-  return beats.length ? { id: newId(), masterBarId: mb.id, beats } : createBar(mb);
 }
 
 /** GP3–7 (via alphaTab) → our model. Keeps the first two guitar, bass, piano or drum tracks. */
