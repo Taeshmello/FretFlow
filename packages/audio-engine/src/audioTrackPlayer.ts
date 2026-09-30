@@ -57,6 +57,7 @@ export class AudioTrackPlayer {
   private playbackRate = 1;
   private gainValue = 1;
   private readonly timeListeners = new ListenerSet<[seconds: number]>();
+  private readonly loopListeners = new ListenerSet<[]>();
   private readonly endedListeners = new ListenerSet<[]>();
   private readonly stateListeners = new ListenerSet<[state: PlayerState]>();
 
@@ -192,6 +193,11 @@ export class AudioTrackPlayer {
     return this.timeListeners.add(listener);
   }
 
+  /** Fires once after an actual A–B loop wrap, never for a user seek. */
+  onLoop(listener: () => void): () => void {
+    return this.loopListeners.add(listener);
+  }
+
   onEnded(listener: () => void): () => void {
     return this.endedListeners.add(listener);
   }
@@ -204,6 +210,7 @@ export class AudioTrackPlayer {
     this.unload();
     this.gain.disconnect();
     this.timeListeners.clear();
+    this.loopListeners.clear();
     this.endedListeners.clear();
     this.stateListeners.clear();
   }
@@ -231,8 +238,10 @@ export class AudioTrackPlayer {
   private readonly handleEnded = (): void => {
     // A loop that ends at the very end of the file can reach `ended` before the fade starts.
     if (this.loop && this.element) {
+      if (this.wrapping) return;
       this.element.currentTime = this.loop.start;
       void this.element.play();
+      this.loopListeners.emit();
       return;
     }
     this.stopTicker();
@@ -281,11 +290,13 @@ export class AudioTrackPlayer {
       return;
     }
     el.currentTime = loop.start;
+    this.loopListeners.emit();
     await Promise.race([
       new Promise<void>(resolve => el.addEventListener('seeked', () => resolve(), { once: true })),
       delay(SEEK_TIMEOUT_MS),
     ]);
     const t = this.context.currentTime;
+    if (el.paused && this.currentState === 'playing') void el.play();
     g.cancelScheduledValues(t);
     g.setValueAtTime(0, t);
     g.linearRampToValueAtTime(this.gainValue, t + this.fadeSeconds);

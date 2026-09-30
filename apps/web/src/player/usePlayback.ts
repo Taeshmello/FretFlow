@@ -3,6 +3,7 @@ import type { Converted } from '@fretflow/render';
 import type { Beat } from '@fretflow/score-model';
 import { useCallback, useEffect, useState } from 'react';
 import { clearPlaybackLoop } from './clearPlaybackLoop';
+import { crossedLoopBoundary } from './speedTrainer';
 
 export interface PlaybackState {
   ready: boolean;
@@ -16,6 +17,7 @@ export interface PlaybackState {
   volume: number;
   positionMs: number;
   endMs: number;
+  loopCount: number;
 }
 
 const INITIAL: PlaybackState = {
@@ -28,6 +30,7 @@ const INITIAL: PlaybackState = {
   volume: 1,
   positionMs: 0,
   endMs: 0,
+  loopCount: 0,
 };
 
 /** alphaSynth transport (D-016). */
@@ -38,10 +41,17 @@ export function usePlayback(api: alphaTab.AlphaTabApi | null) {
     if (!api) {
       return;
     }
+    let previousTick: number | null = null;
     const offs = [
       api.playerReady.on(() => setState(s => ({ ...s, ready: true }))),
       api.playerStateChanged.on(e => setState(s => ({ ...s, playing: e.state === alphaTab.synth.PlayerState.Playing }))),
-      api.playerPositionChanged.on(e => setState(s => ({ ...s, positionMs: e.currentTime, endMs: e.endTime }))),
+      api.playerPositionChanged.on(e => {
+        const range = api.playbackRange;
+        const wrapped = api.isLooping && range !== null
+          && crossedLoopBoundary(previousTick, e.currentTick, range.startTick, range.endTick);
+        previousTick = e.currentTick;
+        setState(s => ({ ...s, positionMs: e.currentTime, endMs: e.endTime, loopCount: s.loopCount + (wrapped ? 1 : 0) }));
+      }),
     ];
     return () => offs.forEach(off => off());
   }, [api]);

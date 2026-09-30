@@ -19,6 +19,7 @@ import { TempoSettings } from '../ui/Settings';
 import { ScoreCard } from './editor/ScoreCard';
 import { TopBar, type Mode } from './editor/TopBar';
 import { useSpeed } from '../player/useSpeed';
+import { useSpeedTrainer } from '../player/useSpeedTrainer';
 import { TransportBar } from './editor/TransportBar';
 import { TouchInput } from './editor/TouchInput';
 import { PracticePanel } from './editor/PracticePanel';
@@ -156,7 +157,18 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
     : playback.state.looping || recording.loop
       ? 'Loop active'
       : null;
-  const looping = playback.state.looping || !!recording.loop;
+  const looping = recording.loaded ? !!recording.loop : playback.state.looping;
+  const playbackRange = api?.playbackRange;
+  const loopKey = recording.loaded
+    ? recording.loop ? `audio:${recording.loop.start}:${recording.loop.end}` : ''
+    : playbackRange ? `synth:${playbackRange.startTick}:${playbackRange.endTick}` : '';
+  const trainer = useSpeedTrainer({
+    enabled: mode === 'practice',
+    looping,
+    loopKey,
+    loopCount: recording.loaded ? recording.loopCount : playback.state.loopCount,
+    setSpeed,
+  });
   const fmt = (ms: number) => {
     const seconds = Math.max(0, Math.floor(ms / 1000));
     return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
@@ -230,7 +242,7 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
         canLoop={mode === 'practice' || !!selectedBars}
         onLoop={toggleLoop}
         speed={recording.loaded ? recording.rate : playback.state.speed}
-        onSpeed={setSpeed}
+        onSpeed={trainer.onUserSpeed}
         tempo={tempo}
         tempoEditor={<TempoSettings editor={editor} dispatch={dispatch} />}
         click={recording.loaded ? recording.metronome : playback.state.metronome}
@@ -280,7 +292,8 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
         ) : (
           <PracticePanel
             speed={recording.loaded ? recording.rate : playback.state.speed}
-            onSpeed={setSpeed}
+            onSpeed={trainer.onUserSpeed}
+            trainer={trainer}
             looping={looping}
             loopBars={selectedBars}
             currentBar={editor.cursor.barIndex + 1}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampSpeed, printsFooter, speedPresets, speedRange } from './plan';
+import { canUseSpeedTrainer, clampSpeed, printsFooter, speedPresets, speedRange } from './plan';
 
 describe('plan rules (the server decides the plan, D-010; these only shape the UI)', () => {
   it('slows down to 50% and plays at most at normal speed on the free plan', () => {
@@ -27,5 +27,10 @@ describe('plan rules (the server decides the plan, D-010; these only shape the U
   it('prints the Made with FretFlow footer on free exports only', () => {
     expect(printsFooter('free')).toBe(true);
     expect(printsFooter('pro')).toBe(false);
+  });
+
+  it('unlocks the speed trainer only for the server-provided Pro plan', () => {
+    expect(canUseSpeedTrainer('free')).toBe(false);
+    expect(canUseSpeedTrainer('pro')).toBe(true);
   });
 });

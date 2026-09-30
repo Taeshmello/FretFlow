@@ -48,6 +48,7 @@ export function useRecording(scoreId: string, score: Score, synth: SynthLink) {
   const [duration, setDuration] = useState(0);
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [loopCount, setLoopCount] = useState(0);
   const [rate, setRateState] = useState(1);
   /** Allowed speeds for the plan; kept for a player created later. */
   const rateRangeRef = useRef<[number, number]>([0.5, 1]);
@@ -87,6 +88,7 @@ export function useRecording(scoreId: string, score: Score, synth: SynthLink) {
         setTime(t);
         followRef.current.onAudioTime(t);
       });
+      player.onLoop(() => setLoopCount(n => n + 1));
       player.onState(s => setPlaying(s === 'playing'));
       metroRef.current = new Metronome(ctx, { volume: 0.7 });
       ctxRef.current = ctx;
@@ -207,6 +209,7 @@ export function useRecording(scoreId: string, score: Score, synth: SynthLink) {
     duration,
     time,
     playing,
+    loopCount,
     rate,
     loop,
     mix,

@@ -23,3 +23,8 @@ export function speedPresets(plan: Plan): number[] {
 export function printsFooter(plan: Plan): boolean {
   return plan !== 'pro';
 }
+
+/** Automatic speed increases on each loop are reserved for Pro practice. */
+export function canUseSpeedTrainer(plan: Plan): boolean {
+  return plan === 'pro';
+}

@@ -1,4 +1,5 @@
 Claude에게 이어서 부탁드립니다 — FretFlow, 2026-09-29
+이 문서는 9월 29일의 과거 인계입니다. 현재 상태는 HANDOFF_CLAUDE_2026-09-30.txt와 docs/PROGRESS.md 최신 항목을 먼저 보세요.
 
 저장소: /Users/kimtaeho/Desktop/FretFlow/
 먼저 CLAUDE.md, docs/DECISIONS.md, docs/SPEC.md, docs/ROADMAP.md, docs/PROGRESS.md를 읽고 현재 HEAD와 작업 상태를 확인해 주세요. 이 파일은 작업 맥락이며, 사용자의 최신 요청과 저장소 규칙을 우선해 주세요.
