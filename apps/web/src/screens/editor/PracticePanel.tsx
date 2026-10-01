@@ -1,7 +1,9 @@
 import { Metronome, Repeat } from 'lucide-react';
+import { useState } from 'react';
 import { canUseSpeedTrainer, speedPresets, speedRange } from '../../app/plan';
 import { usePlan } from '../../app/session';
 import type { SpeedTrainer } from '../../player/useSpeedTrainer';
+import type { PracticeRoutine } from '../../player/usePracticeRoutine';
 
 interface Props {
   speed: number;
@@ -14,11 +16,14 @@ interface Props {
   onMetronome: () => void;
   hasRecording: boolean;
   trainer: SpeedTrainer;
+  routine: PracticeRoutine;
 }
 
 /** Controls kept beside the score on desktop and below it on touch screens. */
 export function PracticePanel(p: Props) {
   const plan = usePlan();
+  const [sectionName, setSectionName] = useState('');
+  const [targetReps, setTargetReps] = useState(3);
   const [min, max] = speedRange(plan);
   const loopText = p.loopBars
     ? `Bars ${p.loopBars[0]}${p.loopBars[0] === p.loopBars[1] ? '' : `–${p.loopBars[1]}`}`
@@ -93,6 +98,47 @@ export function PracticePanel(p: Props) {
             {p.trainer.state?.active ? 'Stop trainer' : p.trainer.state?.completed ? 'Restart trainer' : 'Start trainer'}
           </button>
           {!p.looping && <p className="muted small">Turn on a score or recording loop first.</p>}
+        </div>
+      )}
+      <div className="practice-control-divider" />
+      <div className="trainer-head"><h4>Practice routine</h4><span className="plan-badge pro">Pro</span></div>
+      {plan !== 'pro' ? (
+        <p className="muted small">Save difficult passages, practise them in order, and track completed sessions. Basic looping stays free. Checkout is not live yet.</p>
+      ) : (
+        <div className="trainer-controls">
+          <p className="muted small">Saved in this browser for this account and score. Select bars, then save a passage. Start the routine and press Play; each target advances to the next passage.</p>
+          <label>Passage name
+            <input aria-label="Passage name" maxLength={60} value={sectionName} placeholder={loopText} onChange={e => setSectionName(e.target.value)} />
+          </label>
+          <label>Loops to complete
+            <select aria-label="Loops to complete" value={targetReps} onChange={e => setTargetReps(Number(e.target.value))}>
+              {[1, 2, 3, 4, 5, 8, 10].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+          <button type="button" className="btn" disabled={!p.routine.ready || p.routine.sections.length >= 30} onClick={() => {
+            const bars = p.loopBars ?? [p.currentBar, p.currentBar];
+            if (p.routine.add(sectionName, bars, targetReps)) setSectionName('');
+          }}>Save passage</button>
+          {p.routine.error && <p className="small banner error" role="alert">{p.routine.error}</p>}
+          {p.routine.sections.length > 0 && (
+            <>
+              <button type="button" className="btn primary" onClick={() => p.routine.activeId ? p.routine.stop() : p.routine.start()}>
+                {p.routine.activeId ? 'Stop routine' : 'Start routine'}
+              </button>
+              <ol className="practice-sections">
+                {p.routine.sections.map(section => (
+                  <li key={section.id} className={p.routine.activeId === section.id ? 'active' : ''}>
+                    <div><strong>{section.name}</strong><span className="muted small">Bars {section.startBar}–{section.endBar} · {p.routine.activeId === section.id ? `${p.routine.repetitions}/${section.targetReps} loops` : `${section.targetReps} loops`}</span></div>
+                    <span className="muted small">Completed {section.completedSessions} {section.completedSessions === 1 ? 'time' : 'times'}{section.lastPracticedAt ? ` · Last ${new Date(section.lastPracticedAt).toLocaleDateString()}` : ''}</span>
+                    <div className="practice-section-actions">
+                      <button type="button" className="ghost small" onClick={() => p.routine.start(section.id)}>Practise</button>
+                      <button type="button" className="ghost small" aria-label={`Remove ${section.name}`} onClick={() => p.routine.remove(section.id)}>Remove</button>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
         </div>
       )}
     </aside>

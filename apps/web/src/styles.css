@@ -1497,6 +1497,42 @@ kbd {
   font-size: 18px;
 }
 
+.practice-sections {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.practice-sections li {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.practice-sections li.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.practice-sections li > div:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 8px;
+}
+
+.practice-section-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .fret-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 260px;

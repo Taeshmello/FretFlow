@@ -1,4 +1,5 @@
 import { cursorBeat, cursorTrack, selectionRange, beatsInRange } from '@fretflow/editor-core';
+import { loopFromBars } from '@fretflow/audio-engine';
 import type { Converted } from '@fretflow/render';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { exportAsGp, exportAsJson, exportAsMidi, printScore } from '../app/files';
@@ -20,6 +21,7 @@ import { ScoreCard } from './editor/ScoreCard';
 import { TopBar, type Mode } from './editor/TopBar';
 import { useSpeed } from '../player/useSpeed';
 import { useSpeedTrainer } from '../player/useSpeedTrainer';
+import { usePracticeRoutine } from '../player/usePracticeRoutine';
 import { TransportBar } from './editor/TransportBar';
 import { TouchInput } from './editor/TouchInput';
 import { PracticePanel } from './editor/PracticePanel';
@@ -169,6 +171,37 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
     loopCount: recording.loaded ? recording.loopCount : playback.state.loopCount,
     setSpeed,
   });
+  const applyPracticeLoop = (bars: [number, number] | null) => {
+    if (recording.loaded) {
+      if (!bars) {
+        recording.setLoop(null);
+      } else {
+        const region = loopFromBars(recording.map, recording.tempo, bars[0] - 1, bars[1] - 1);
+        recording.setLoop(region);
+        if (region) recording.seek(region.start);
+      }
+      return;
+    }
+    if (!bars) {
+      playback.setLoopRange(null, null, null);
+      return;
+    }
+    const track = editor.score.tracks.find(t => t.id === editor.cursor.trackId);
+    const beats = track?.bars.slice(bars[0] - 1, bars[1]).flatMap(bar => bar.beats) ?? [];
+    const first = beats[0];
+    const last = beats[beats.length - 1];
+    if (first && last) {
+      playback.setLoopRange(convertedRef.current, first, last);
+      const rendered = convertedRef.current?.beats.get(first.id);
+      if (api && rendered) api.tickPosition = rendered.absolutePlaybackStart;
+    }
+  };
+  const routine = usePracticeRoutine({
+    scoreId: editor.score.id,
+    barCount: editor.score.masterBars.length,
+    loopCount: recording.loaded ? recording.loopCount : playback.state.loopCount,
+    onLoopRange: applyPracticeLoop,
+  });
   const fmt = (ms: number) => {
     const seconds = Math.max(0, Math.floor(ms / 1000));
     return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
@@ -294,6 +327,7 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
             speed={recording.loaded ? recording.rate : playback.state.speed}
             onSpeed={trainer.onUserSpeed}
             trainer={trainer}
+            routine={routine}
             looping={looping}
             loopBars={selectedBars}
             currentBar={editor.cursor.barIndex + 1}

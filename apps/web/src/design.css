@@ -581,6 +581,8 @@
 .trainer-fields label { display: grid; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 650; }
 .trainer-fields select { min-width: 0; width: 100%; min-height: 36px; padding: 5px; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: var(--ink); font: inherit; font-size: 12px; }
 .trainer-controls .btn { justify-content: center; }
+.trainer-controls > label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; font-weight: 650; }
+.trainer-controls > label input, .trainer-controls > label select { width: 100%; min-width: 0; min-height: 38px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); font: inherit; }
 
 @media (max-width: 700px) {
   .new-score-form {
