@@ -1,28 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import type { PrintOptions } from '../app/files';
 import { printsFooter } from '../app/plan';
 import { usePlan } from '../app/session';
-
-export function Modal({ title, onClose, children, wide, className = '' }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; className?: string }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const d = ref.current;
-    if (d && !d.open) {
-      d.showModal();
-    }
-  }, []);
-  return (
-    <dialog ref={ref} className={`modal${wide ? ' wide' : ''} ${className}`} onClose={onClose} onCancel={onClose} aria-label={title}>
-      <header>
-        <h2>{title}</h2>
-        <button type="button" className="icon" aria-label="Close" onClick={onClose}>
-          ✕
-        </button>
-      </header>
-      <div className="modal-body">{children}</div>
-    </dialog>
-  );
-}
+import { Modal } from './Modal';
+import { ProUpgradeButton } from './ProUpgrade';
+export { Modal } from './Modal';
 
 interface ExportProps {
   barCount: number;
@@ -85,6 +67,7 @@ export function ExportDialog(p: ExportProps) {
             </div>
           )}
           <p className="muted small export-help">{format === 'pdf' ? `Choose “Save as PDF” in the print window. ${printsFooter(plan) ? 'Free exports have a small “Made with FretFlow” footer; Pro removes it.' : 'Pro: no FretFlow footer.'}` : 'Recordings and beat maps are never included in exported files.'}</p>
+          {format === 'pdf' && plan !== 'pro' && <ProUpgradeButton label="Remove footer with Pro" className="ghost small" />}
         </div>
         <div className="export-preview" aria-label="Page layout preview">
           <div className={`preview-page ${paper}`}>

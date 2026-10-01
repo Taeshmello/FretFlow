@@ -4,6 +4,7 @@ import { canUseSpeedTrainer, speedPresets, speedRange } from '../../app/plan';
 import { usePlan } from '../../app/session';
 import type { SpeedTrainer } from '../../player/useSpeedTrainer';
 import type { PracticeRoutine } from '../../player/usePracticeRoutine';
+import { ProFeaturePreview, ProUpgradeButton } from '../../ui/ProUpgrade';
 
 interface Props {
   speed: number;
@@ -52,6 +53,7 @@ export function PracticePanel(p: Props) {
         ))}
       </div>
       <p className="muted small">Pitch stays the same when you slow down.{plan === 'pro' ? '' : ' 25–150% comes with Pro.'}</p>
+      {plan !== 'pro' && <ProUpgradeButton label="See Pro speed range" className="ghost small" />}
       <div className="practice-control-divider" />
       <button type="button" className={`practice-loop-button${p.looping ? ' active' : ''}`} aria-pressed={p.looping} onClick={p.onLoop}>
         <Repeat size={17} />
@@ -65,10 +67,10 @@ export function PracticePanel(p: Props) {
       </button>
       <p className="muted small practice-help">Select bars in the score to loop them.{!p.hasRecording && ' Add a recording to practise with its waveform.'}</p>
       <div className="practice-control-divider" />
-      <div className="trainer-head"><h4>Speed trainer</h4><span className="plan-badge pro">Pro</span></div>
       {!canUseSpeedTrainer(plan) ? (
-        <p className="muted small">Repeat a passage and automatically raise the speed after each loop. Available with Pro; checkout is not live yet.</p>
-      ) : (
+        <ProFeaturePreview title="Speed trainer" description="Repeat a passage and raise the speed after each loop." preview="60% → 65% → 70% → target" />
+      ) : (<>
+        <div className="trainer-head"><h4>Speed trainer</h4><span className="plan-badge pro">Pro</span></div>
         <div className="trainer-controls">
           <div className="trainer-fields">
             <label>Start
@@ -99,12 +101,12 @@ export function PracticePanel(p: Props) {
           </button>
           {!p.looping && <p className="muted small">Turn on a score or recording loop first.</p>}
         </div>
-      )}
+      </>)}
       <div className="practice-control-divider" />
-      <div className="trainer-head"><h4>Practice routine</h4><span className="plan-badge pro">Pro</span></div>
       {plan !== 'pro' ? (
-        <p className="muted small">Save difficult passages, practise them in order, and track completed sessions. Basic looping stays free. Checkout is not live yet.</p>
-      ) : (
+        <ProFeaturePreview title="Practice routine" description="Save passages, practise them in order, and track completed sessions. Basic looping stays free." preview="Intro · 3 loops  →  Solo · 5 loops" />
+      ) : (<>
+        <div className="trainer-head"><h4>Practice routine</h4><span className="plan-badge pro">Pro</span></div>
         <div className="trainer-controls">
           <p className="muted small">Saved in this browser for this account and score. Select bars, then save a passage. Start the routine and press Play; each target advances to the next passage.</p>
           <label>Passage name
@@ -140,7 +142,7 @@ export function PracticePanel(p: Props) {
             </>
           )}
         </div>
-      )}
+      </>)}
     </aside>
   );
 }

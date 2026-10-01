@@ -583,6 +583,15 @@
 .trainer-controls .btn { justify-content: center; }
 .trainer-controls > label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; font-weight: 650; }
 .trainer-controls > label input, .trainer-controls > label select { width: 100%; min-width: 0; min-height: 38px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); font: inherit; }
+.pro-preview { position: relative; display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #f8f9fc; overflow: hidden; }
+.pro-preview-copy { transition: filter .18s ease, opacity .18s ease; }
+.pro-preview-copy p { margin: 8px 0; }
+.pro-preview-example { padding: 8px; border-radius: 8px; background: #fff; color: var(--muted); font-size: 12px; }
+.pro-preview-action { justify-self: start; min-height: 34px; }
+.pro-preview:hover .pro-preview-copy, .pro-preview:focus-within .pro-preview-copy { filter: blur(1.5px); opacity: .7; }
+.pro-preview:hover .pro-preview-action, .pro-preview:focus-within .pro-preview-action { box-shadow: 0 6px 18px rgba(42, 85, 214, .26); }
+.pro-benefits { padding-left: 20px; line-height: 1.6; }
+@media (prefers-reduced-motion: reduce) { .pro-preview-copy { transition: none; } }
 
 @media (max-width: 700px) {
   .new-score-form {
@@ -697,6 +706,11 @@
     margin: 0;
   }
 
+  .touch-guide-modes { display: flex; gap: 6px; }
+  .touch-guide-modes button { min-height: 32px; padding: 4px 9px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+  .touch-guide-modes button[aria-pressed='true'] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .touch-guide > select { max-width: 100%; min-height: 34px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); }
+
   .touch-guide-notes {
     display: flex;
     gap: 6px;
@@ -743,6 +757,9 @@
   .guide-tension {
     --guide-color: #dc5e54;
   }
+
+  .guide-root { --guide-color: #e6a625; }
+  .guide-scale { --guide-color: #42bdce; }
 }
 
 /* ---------- piano keyboard & drum pads (D-023) ---------- */

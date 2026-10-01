@@ -8,7 +8,7 @@ export interface SoloGuide { chord: string | null; notes: GuideNote[]; message: 
 const ROOTS: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
 const pc = (pitch: number) => ((pitch % 12) + 12) % 12;
 
-function chordShape(symbol: string): { root: number; chord: Set<number>; scale: Set<number> } | null {
+export function chordShape(symbol: string): { root: number; rootName: string; quality: string; chord: Set<number>; scale: Set<number> } | null {
   const match = /^([A-G])([#b]?)([^/]*)/.exec(symbol.trim());
   if (!match) return null;
   const root = pc(ROOTS[match[1]] + (match[2] === '#' ? 1 : match[2] === 'b' ? -1 : 0));
@@ -20,7 +20,7 @@ function chordShape(symbol: string): { root: number; chord: Set<number>; scale: 
   const intervals = quality === '5' ? [0, 7] : [0, third, fifth];
   if (quality.includes('7')) intervals.push(quality.startsWith('maj') || quality.startsWith('M') || quality === 'mmaj7' ? 11 : quality === 'dim7' ? 9 : 10);
   const scaleIntervals = minor || quality.startsWith('dim') ? [0, 2, 3, 5, 7, 8, 10] : [0, 2, 4, 5, 7, 9, 11];
-  return { root, chord: new Set(intervals.map(n => pc(root + n))), scale: new Set(scaleIntervals.map(n => pc(root + n))) };
+  return { root, rootName: `${match[1]}${match[2]}`, quality, chord: new Set(intervals.map(n => pc(root + n))), scale: new Set(scaleIntervals.map(n => pc(root + n))) };
 }
 
 function context(cursor: Cursor, track: Track): { chord: string | null; anchor: { pitch: number; fret: number; string: number } | null } {

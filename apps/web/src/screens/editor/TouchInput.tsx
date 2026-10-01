@@ -4,6 +4,7 @@ import { DrumPad } from '../../ui/DrumPad';
 import { PianoKeyboard } from '../../ui/PianoKeyboard';
 import { useMemo, useState } from 'react';
 import { previewPitch } from '../../audio/preview';
+import { recommendScales, scaleToneKind } from '../../ui/scaleGuide';
 import { suggestNextNotes } from '../../ui/soloGuide';
 
 interface Props {
@@ -37,7 +38,11 @@ const TECHNIQUES: { label: string; command: Command }[] = [
 export function TouchInput({ editor, dispatch, octave, onOctave }: Props) {
   const [highFrets, setHighFrets] = useState(false);
   const [guideOn, setGuideOn] = useState(false);
+  const [guideView, setGuideView] = useState<'scale' | 'next'>('scale');
+  const [selectedScaleId, setSelectedScaleId] = useState('');
   const guide = useMemo(() => (guideOn ? suggestNextNotes(editor.score, editor.cursor, 15) : null), [guideOn, editor.score, editor.cursor]);
+  const scales = useMemo(() => recommendScales(guide?.chord ?? null), [guide?.chord]);
+  const selectedScale = scales.find(s => s.id === selectedScaleId) ?? scales[0];
   const track = cursorTrack(editor.score, editor.cursor);
   const beat = cursorBeat(editor.score, editor.cursor);
   const note = beat?.notes.find(item => item.string === editor.cursor.string);
@@ -54,9 +59,21 @@ export function TouchInput({ editor, dispatch, octave, onOctave }: Props) {
       </div>
       {fretted && guide && (
         <div className="touch-guide" role="group" aria-label="Solo note guide">
-          <p className="muted small">Rule-based, not generative AI · {guide.message}</p>
+          <div className="touch-guide-modes" role="group" aria-label="Solo guide view">
+            <button type="button" aria-pressed={guideView === 'scale'} onClick={() => setGuideView('scale')}>Scale map</button>
+            <button type="button" aria-pressed={guideView === 'next'} onClick={() => setGuideView('next')}>Next notes</button>
+          </div>
+          {guideView === 'scale' && selectedScale && <select aria-label="Suggested scale" value={selectedScale.id} onChange={e => setSelectedScaleId(e.target.value)}>
+            {scales.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>}
+          <p className="muted small">Theory-based, not generative AI · {guideView === 'scale' && selectedScale ? `${selectedScale.reason} String ${editor.cursor.string}: gold = root, blue = chord, cyan = scale.` : guide.message}</p>
           <div className="touch-guide-notes">
-            {guide.notes.map(n => (
+            {(guideView === 'next' ? guide.notes : selectedScale ? frets.flatMap(fret => {
+              const string = editor.cursor.string;
+              const pitch = track.tuning[string - 1] + track.capo + fret;
+              const kind = scaleToneKind(selectedScale, pitch);
+              return kind ? [{ string, fret, pitch, kind, reason: `${selectedScale.name} · ${kind} tone` }] : [];
+            }) : []).map(n => (
               <span key={`${n.string}:${n.fret}`} className={`guide-chip guide-${n.kind}`}>
                 <button type="button" title={n.reason} onClick={() => dispatch({ type: 'placeFret', string: n.string, fret: n.fret })}>
                   str {n.string} · {n.fret} <small>{pitchName(n.pitch)}</small>

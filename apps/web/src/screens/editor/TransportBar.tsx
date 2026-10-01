@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Popover } from '../../ui/Popover';
 import { speedPresets, speedRange } from '../../app/plan';
 import { usePlan } from '../../app/session';
+import { ProUpgradeButton } from '../../ui/ProUpgrade';
 
 interface Props {
   playing: boolean;
@@ -60,6 +61,7 @@ export function TransportBar(p: Props) {
             ))}
           </div>
           <p className="muted small">{plan === 'pro' ? 'Pro: 25–150%.' : '25–150% comes with Pro.'}</p>
+          {plan !== 'pro' && <ProUpgradeButton label="Explore Pro speeds" className="chip" />}
         </div>
       </Popover>
       <button type="button" className="pill" disabled title="Pitch control is planned for Pro">

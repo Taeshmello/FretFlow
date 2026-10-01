@@ -792,6 +792,21 @@ kbd {
   min-width: 720px;
 }
 
+.fb-guide-modes { display: flex; gap: 4px; }
+.fb-guide-head select { min-height: 34px; max-width: 190px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); padding: 4px 7px; }
+
+.fb-scale {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(25, 37, 53, .32);
+}
+.fb-scale-root { width: 21px; height: 21px; background: #e6a625; box-shadow: 0 0 0 2px #80550b, 0 0 10px #e6a625; }
+.fb-scale-chord { width: 18px; height: 18px; background: #4285f4; box-shadow: 0 0 0 1px #244b9c, 0 0 8px #4285f4; }
+.fb-scale-scale { background: #42bdce; box-shadow: 0 0 0 1px #24717a; }
+
 .fb-hint {
   width: 16px;
   height: 16px;
