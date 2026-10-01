@@ -86,7 +86,7 @@ export function Fretboard({ editor, dispatch }: Props) {
                   className={`fb-cell${fret === 0 ? ' is-nut' : ''}`}
                   style={{ gridColumn: fret + 1, gridRow: string }}
                   title={`String ${string}, fret ${fret} · ${pitchName(pitch)}${hint ? ` · ${hint.reason}` : ''}${scaleKind ? ` · ${scaleKind === 'root' ? 'Scale root' : scaleKind === 'chord' ? 'Chord tone' : 'Scale tone'}` : ''} · ⌥/Alt+click to listen`}
-                  onClick={e => (e.altKey ? previewPitch(pitch) : dispatch({ type: 'placeFret', string, fret }))}
+                  onClick={e => (e.altKey ? previewPitch(pitch, track.instrument === 'bass' ? 'bass' : 'guitar') : dispatch({ type: 'placeFret', string, fret }))}
                 >
                   {note && <span className={`fb-dot${isCursorNote ? ' is-cursor' : ''}`}>{pitchName(pitch).replace(/-?\d+$/, '')}</span>}
                   {same && !scaleKind && !hint && <span className="fb-ring" />}

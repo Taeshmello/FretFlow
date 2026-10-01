@@ -54,7 +54,7 @@ export function useAlphaTab(scrollElement: React.RefObject<HTMLElement | null>) 
       },
       player: {
         playerMode: alphaTab.PlayerMode.EnabledSynthesizer,
-        soundFont: '/soundfont/sonivox.sf2',
+        soundFont: '/soundfont/FluidR3Mono_GM.sf3',
         enableCursor: true,
         enableAnimatedBeatCursor: true,
         enableUserInteraction: false,

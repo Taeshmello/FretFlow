@@ -78,7 +78,7 @@ export function TouchInput({ editor, dispatch, octave, onOctave }: Props) {
                 <button type="button" title={n.reason} onClick={() => dispatch({ type: 'placeFret', string: n.string, fret: n.fret })}>
                   str {n.string} · {n.fret} <small>{pitchName(n.pitch)}</small>
                 </button>
-                <button type="button" className="guide-listen" aria-label={`Listen to string ${n.string}, fret ${n.fret}`} onClick={() => previewPitch(n.pitch)}>♪</button>
+                <button type="button" className="guide-listen" aria-label={`Listen to string ${n.string}, fret ${n.fret}`} onClick={() => previewPitch(n.pitch, track.instrument === 'bass' ? 'bass' : 'guitar')}>♪</button>
               </span>
             ))}
           </div>

@@ -27,7 +27,7 @@ export function PianoKeyboard({ editor, dispatch, octave, onOctave, span = 3 }: 
 
   const press = (pitch: number) => {
     if (!lit.has(pitch)) {
-      previewPitch(pitch);
+      previewPitch(pitch, 'piano');
     }
     dispatch({ type: 'togglePitch', pitch });
   };

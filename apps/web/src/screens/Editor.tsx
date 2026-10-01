@@ -139,7 +139,7 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
         // Hear a key or drum as it is added, like the guitar audition.
         const beat = cursorBeat(score, cursor);
         if (c.type === 'togglePitch' && !beat?.keys?.some(k => k.pitch === c.pitch)) {
-          previewPitch(c.pitch);
+          previewPitch(c.pitch, 'piano');
         } else if (c.type === 'toggleHit' && !beat?.hits?.some(h => h.piece === c.piece)) {
           previewDrum(c.piece);
         }

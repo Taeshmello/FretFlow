@@ -6,28 +6,33 @@ export function midiToHz(pitch: number): number {
 let ctx: AudioContext | null = null;
 
 /**
- * Plays a short plucked tone for a candidate note without writing it into the score.
- * Independent of alphaSynth so it works before the soundfont has loaded.
+ * Lightweight note preview while alphaSynth reloads the edited score. A few
+ * decaying sine partials avoid the harsh sawtooth used by the old preview.
  */
-export function previewPitch(pitch: number, seconds = 0.7): void {
+export function previewPitch(pitch: number, instrument: 'guitar' | 'bass' | 'piano' = 'guitar'): void {
   try {
     ctx ??= new AudioContext();
     void ctx.resume();
     const t = ctx.currentTime;
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.exponentialRampToValueAtTime(0.25, t + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + seconds);
-    const lowpass = ctx.createBiquadFilter();
-    lowpass.type = 'lowpass';
-    lowpass.frequency.setValueAtTime(3200, t);
-    lowpass.frequency.exponentialRampToValueAtTime(700, t + seconds);
-    const osc = ctx.createOscillator();
-    osc.type = 'sawtooth';
-    osc.frequency.value = midiToHz(pitch);
-    osc.connect(lowpass).connect(gain).connect(ctx.destination);
-    osc.start(t);
-    osc.stop(t + seconds + 0.05);
+    const duration = instrument === 'piano' ? 1.1 : instrument === 'bass' ? 0.85 : 0.75;
+    const partials = instrument === 'piano' ? [0.75, 0.28, 0.12, 0.05]
+      : instrument === 'bass' ? [0.85, 0.17, 0.06] : [0.8, 0.24, 0.1, 0.035];
+    const envelope = ctx.createGain();
+    envelope.gain.setValueAtTime(0.0001, t);
+    envelope.gain.exponentialRampToValueAtTime(0.18, t + 0.008);
+    envelope.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    envelope.connect(ctx.destination);
+    const fundamental = midiToHz(pitch);
+    partials.forEach((level, i) => {
+      const tone = ctx!.createOscillator();
+      const harmonicGain = ctx!.createGain();
+      tone.type = 'sine';
+      tone.frequency.value = fundamental * (i + 1);
+      harmonicGain.gain.value = level;
+      tone.connect(harmonicGain).connect(envelope);
+      tone.start(t);
+      tone.stop(t + duration + 0.02);
+    });
   } catch {
     // No audio (e.g. blocked autoplay): the preview is optional.
   }

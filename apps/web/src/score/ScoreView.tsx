@@ -168,7 +168,7 @@ export function ScoreView({ api, containerRef, editor, audition, viewMode, dispa
         const note = beat?.notes.find(n => n.string === audition.string);
         if (beat) {
           if (note) {
-            previewPitch(note.pitch);
+            previewPitch(note.pitch, track.instrument === 'bass' ? 'bass' : 'guitar');
           }
           return;
         }

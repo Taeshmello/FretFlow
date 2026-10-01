@@ -143,6 +143,7 @@ const LICENSES: { name: string; use: string; license: string; url: string }[] = 
   { name: 'alphaTab', use: 'Score rendering, synthesizer, Guitar Pro import/export', license: 'MPL-2.0', url: 'https://github.com/CoderLine/alphaTab' },
   { name: 'Bravura', use: 'Music notation font', license: 'SIL OFL 1.1', url: 'https://github.com/steinbergmedia/bravura' },
   { name: 'Sonivox soundfont', use: 'Instrument sounds for playback · based on Sonivox EAS, © 2004–2006 Sonic Network Inc. (AOSP)', license: 'Apache-2.0', url: 'https://musical-artifacts.com/artifacts/1517' },
+  { name: 'FluidR3Mono GM soundfont', use: 'Default instrument sounds · Frank Wen, Michael Cowgill and contributors', license: 'MIT', url: 'https://github.com/musescore/MuseScore/blob/2.1/share/sound/FluidR3Mono_License.md' },
   { name: 'Inter', use: 'Interface font', license: 'SIL OFL 1.1', url: 'https://github.com/rsms/inter' },
   { name: 'JetBrains Mono', use: 'Numbers and frets font', license: 'SIL OFL 1.1', url: 'https://github.com/JetBrains/JetBrainsMono' },
   { name: 'Lucide', use: 'Icons', license: 'ISC', url: 'https://github.com/lucide-icons/lucide' },
