@@ -104,7 +104,7 @@ export function PracticePanel(p: Props) {
       </>)}
       <div className="practice-control-divider" />
       {plan !== 'pro' ? (
-        <ProFeaturePreview title="Practice routine" description="Save passages, practise them in order, and track completed sessions. Basic looping stays free." preview="Intro · 3 loops  →  Solo · 5 loops" />
+        <ProFeaturePreview title="Practice routine" description="Save passages, practise them in order, and track completed sessions with Pro." preview="Intro · 3 loops  →  Solo · 5 loops" />
       ) : (<>
         <div className="trainer-head"><h4>Practice routine</h4><span className="plan-badge pro">Pro</span></div>
         <div className="trainer-controls">

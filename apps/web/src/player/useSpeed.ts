@@ -12,7 +12,7 @@ interface Targets {
 
 /**
  * Speed for the recording and the synth together, kept inside the plan's range
- * (free 50–100%, Pro 25–150%). A plan change (sign in/out) pulls the speed back in.
+ * (free normal playback only, Pro 25–150%). A plan change pulls the speed back in.
  */
 export function useSpeed(t: Targets): (speed: number) => void {
   const plan = usePlan();

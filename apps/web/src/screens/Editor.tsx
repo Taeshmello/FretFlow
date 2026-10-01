@@ -11,6 +11,8 @@ import { useAlphaTab, type ViewMode } from '../score/useAlphaTab';
 import { useRecording } from '../audio/useRecording';
 import { WaveformCard } from '../audio/WaveformCard';
 import { ExportDialog, HelpDialog } from '../ui/Dialogs';
+import { ProUpgradeDialog } from '../ui/ProUpgrade';
+import { usePlan } from '../app/session';
 import { Fretboard, KeyboardHints } from '../ui/Fretboard';
 import { NotePanel } from '../ui/NotePanel';
 import { PianoKeyboard } from '../ui/PianoKeyboard';
@@ -39,11 +41,13 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
   const scrollRef = useRef<HTMLDivElement>(null);
   const { containerRef, api, error } = useAlphaTab(scrollRef);
   const playback = usePlayback(api);
+  const plan = usePlan();
   const [viewMode, setViewMode] = useState<ViewMode>('scoreTab');
   const [mode, setMode] = useState<Mode>('write');
   /** Octave the piano letter keys type into (4 = middle C). */
   const [octave, setOctave] = useState(4);
   const [dialog, setDialog] = useState<'export' | 'help' | null>(null);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const convertedRef = useRef<Converted | null>(null);
   const onConverted = useCallback((c: Converted) => {
     convertedRef.current = c;
@@ -82,14 +86,29 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
     getTick: getSynthTick,
     seek: seekSynth,
   });
+  const practiceEnabled = plan === 'pro';
+  const useRecordingPlayback = practiceEnabled && recording.loaded;
+  useEffect(() => {
+    if (!practiceEnabled) {
+      setMode('write');
+      recording.pause();
+      recording.setLoop(null);
+      recording.setMetronome(false);
+      playback.setLoopRange(null, null, null);
+      playback.update({ metronome: false, countIn: false, speed: 1 });
+    }
+    // Only react to entitlement changes, not to each player state update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [practiceEnabled]);
   const setSpeed = useSpeed({
-    speed: recording.loaded ? recording.rate : playback.state.speed,
+    speed: useRecordingPlayback ? recording.rate : playback.state.speed,
     setRecordingRate: recording.setRate,
     setRecordingRange: recording.setRateRange,
     setSynthSpeed: speed => playback.update({ speed }),
   });
 
   const loopSelection = useCallback(() => {
+    if (!practiceEnabled) return;
     const { selection, score, cursor } = store.state;
     if (playback.state.looping) {
       playback.setLoopRange(null, null, null);
@@ -101,7 +120,7 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
       trackEvent('loop_used', { source: 'synth' });
       playback.setLoopRange(convertedRef.current, beats[0].beat, beats[beats.length - 1].beat);
     }
-  }, [playback, store]);
+  }, [playback, store, practiceEnabled]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -159,19 +178,20 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
     : playback.state.looping || recording.loop
       ? 'Loop active'
       : null;
-  const looping = recording.loaded ? !!recording.loop : playback.state.looping;
+  const looping = useRecordingPlayback ? !!recording.loop : playback.state.looping;
   const playbackRange = api?.playbackRange;
-  const loopKey = recording.loaded
+  const loopKey = useRecordingPlayback
     ? recording.loop ? `audio:${recording.loop.start}:${recording.loop.end}` : ''
     : playbackRange ? `synth:${playbackRange.startTick}:${playbackRange.endTick}` : '';
   const trainer = useSpeedTrainer({
-    enabled: mode === 'practice',
+    enabled: practiceEnabled && mode === 'practice',
     looping,
     loopKey,
-    loopCount: recording.loaded ? recording.loopCount : playback.state.loopCount,
+    loopCount: useRecordingPlayback ? recording.loopCount : playback.state.loopCount,
     setSpeed,
   });
   const applyPracticeLoop = (bars: [number, number] | null) => {
+    if (!practiceEnabled) return;
     if (recording.loaded) {
       if (!bars) {
         recording.setLoop(null);
@@ -199,7 +219,7 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
   const routine = usePracticeRoutine({
     scoreId: editor.score.id,
     barCount: editor.score.masterBars.length,
-    loopCount: recording.loaded ? recording.loopCount : playback.state.loopCount,
+    loopCount: useRecordingPlayback ? recording.loopCount : playback.state.loopCount,
     onLoopRange: applyPracticeLoop,
   });
   const fmt = (ms: number) => {
@@ -211,6 +231,7 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
   const stringInstrument = activeTrack.instrument === 'guitar' || activeTrack.instrument === 'bass';
 
   function toggleLoop() {
+    if (!practiceEnabled) return;
     if (recording.loaded) {
       if (recording.loop) {
         recording.setLoop(null);
@@ -225,6 +246,7 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
 
 
   function toggleMetronome() {
+    if (!practiceEnabled) return;
     if (recording.loaded) {
       recording.setMetronome(!recording.metronome);
     } else {
@@ -233,7 +255,7 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
   }
 
   function playMain() {
-    if (recording.loaded) {
+    if (useRecordingPlayback) {
       if (recording.playing) {
         recording.pause();
       } else {
@@ -253,7 +275,8 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
         saveLabel={saveLabel}
         saveError={saveError}
         mode={mode}
-        onMode={setMode}
+        practiceLocked={!practiceEnabled}
+        onMode={next => next === 'practice' && !practiceEnabled ? setUpgradeOpen(true) : setMode(next)}
         canUndo={editor.history.undo.length > 0}
         canRedo={editor.history.redo.length > 0}
         onUndo={() => dispatch({ type: 'undo' })}
@@ -266,35 +289,35 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
       {error && <div className="banner error">Score display error: {error}</div>}
       {editor.notice && <div className="banner">{editor.notice}</div>}
       <TransportBar
-        playing={recording.loaded ? recording.playing : playback.state.playing}
-        ready={recording.loaded || playback.state.ready}
-        position={recording.loaded ? `${fmt(recording.time * 1000)} / ${fmt(recording.duration * 1000)}` : position}
+        playing={useRecordingPlayback ? recording.playing : playback.state.playing}
+        ready={useRecordingPlayback || playback.state.ready}
+        position={useRecordingPlayback ? `${fmt(recording.time * 1000)} / ${fmt(recording.duration * 1000)}` : position}
         onPlayPause={playMain}
         loopLabel={loopLabel}
         looping={looping}
         canLoop={mode === 'practice' || !!selectedBars}
         onLoop={toggleLoop}
-        speed={recording.loaded ? recording.rate : playback.state.speed}
+        speed={useRecordingPlayback ? recording.rate : playback.state.speed}
         onSpeed={trainer.onUserSpeed}
         tempo={tempo}
         tempoEditor={<TempoSettings editor={editor} dispatch={dispatch} />}
-        click={recording.loaded ? recording.metronome : playback.state.metronome}
+        click={useRecordingPlayback ? recording.metronome : playback.state.metronome}
         onClick={toggleMetronome}
         countIn={playback.state.countIn}
         onCountIn={() => playback.update({ countIn: !playback.state.countIn })}
-        hasRecording={recording.loaded}
+        hasRecording={useRecordingPlayback}
         onRecording={() => document.querySelector<HTMLInputElement>('.wave-card input[type="file"]')?.click()}
         mix={recording.mix}
         onMix={recording.setMix}
       />
       <div className="editor-body">
         <main className="editor-stack">
-          <WaveformCard
+          {practiceEnabled && <WaveformCard
             rec={recording}
             score={editor.score}
             showBeatMap={mode === 'practice'}
             onSetTempo={bpm => dispatch({ type: 'setMasterBar', prop: 'tempo', value: bpm, barIndex: 0 })}
-          />
+          />}
           <ScoreCard
             api={api}
             containerRef={containerRef}
@@ -322,7 +345,7 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
         </main>
         {mode === 'write' ? (
           <NotePanel editor={editor} dispatch={dispatch} />
-        ) : (
+        ) : practiceEnabled ? (
           <PracticePanel
             speed={recording.loaded ? recording.rate : playback.state.speed}
             onSpeed={trainer.onUserSpeed}
@@ -336,10 +359,11 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
             onMetronome={toggleMetronome}
             hasRecording={recording.loaded}
           />
-        )}
+        ) : <NotePanel editor={editor} dispatch={dispatch} />}
       </div>
       {mode === 'write' && <TouchInput editor={editor} dispatch={dispatch} octave={octave} onOctave={setOctave} />}
       {dialog === 'help' && <HelpDialog onClose={() => setDialog(null)} />}
+      {upgradeOpen && <ProUpgradeDialog onClose={() => setUpgradeOpen(false)} />}
       {dialog === 'export' && (
         <ExportDialog
           barCount={editor.score.masterBars.length}

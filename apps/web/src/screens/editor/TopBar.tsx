@@ -9,6 +9,7 @@ interface Props {
   saveLabel: string;
   saveError: boolean;
   mode: Mode;
+  practiceLocked: boolean;
   onMode: (m: Mode) => void;
   canUndo: boolean;
   canRedo: boolean;
@@ -38,7 +39,7 @@ export function TopBar(p: Props) {
           Write
         </button>
         <button type="button" role="radio" aria-checked={p.mode === 'practice'} onClick={() => p.onMode('practice')}>
-          Practice
+          Practice {p.practiceLocked && <span className="plan-badge pro">Pro</span>}
         </button>
       </div>
       <div className="topbar-actions">

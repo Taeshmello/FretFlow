@@ -12,19 +12,23 @@ export function ProUpgradeButton({ label = 'Explore Pro', className = 'btn prima
   return (
     <>
       <button type="button" className={className} onClick={() => setOpen(true)}>{label}</button>
-      {open && (
-        <Modal title="FretFlow Pro" onClose={() => setOpen(false)}>
-          <p>Make more progress with every practice session.</p>
-          <ul className="pro-benefits">
-            <li>Practise at 25–150% speed and build tempo automatically.</li>
-            <li>Save passages, run a routine, and track completed sessions.</li>
-            <li>Export clean PDFs without the FretFlow footer.</li>
-          </ul>
-          <p className="muted small">Pro checkout is not available yet. No payment will be taken.</p>
-          <button type="button" className="btn primary" onClick={() => setOpen(false)}>Got it</button>
-        </Modal>
-      )}
+      {open && <ProUpgradeDialog onClose={() => setOpen(false)} />}
     </>
+  );
+}
+
+export function ProUpgradeDialog({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal title="FretFlow Pro" onClose={onClose}>
+      <p>Unlock the complete practice workspace.</p>
+      <ul className="pro-benefits">
+        <li>Loop passages, use the metronome and count-in, and practise at 25–150% speed.</li>
+        <li>Practise with your recording, build tempo automatically, and save routines.</li>
+        <li>Export clean PDFs without the FretFlow footer.</li>
+      </ul>
+      <p className="muted small">Pro checkout is not available yet. No payment will be taken.</p>
+      <button type="button" className="btn primary" onClick={onClose}>Got it</button>
+    </Modal>
   );
 }
 

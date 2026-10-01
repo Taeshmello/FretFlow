@@ -39,7 +39,7 @@ export function TransportBar(p: Props) {
         {p.playing ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
       </button>
       <span className="position mono">{p.ready ? p.position : 'Loading sound…'}</span>
-      <button type="button" className={`pill${p.looping ? ' is-loop' : ''}`} aria-pressed={p.looping} disabled={!p.canLoop && !p.looping} onClick={p.onLoop} title="Loop the selected bars">
+      {plan === 'pro' ? <><button type="button" className={`pill${p.looping ? ' is-loop' : ''}`} aria-pressed={p.looping} disabled={!p.canLoop && !p.looping} onClick={p.onLoop} title="Loop the selected bars">
         <Repeat size={16} /> {p.loopLabel ?? 'Loop'}
       </button>
       <Popover
@@ -60,13 +60,12 @@ export function TransportBar(p: Props) {
               </button>
             ))}
           </div>
-          <p className="muted small">{plan === 'pro' ? 'Pro: 25–150%.' : '25–150% comes with Pro.'}</p>
-          {plan !== 'pro' && <ProUpgradeButton label="Explore Pro speeds" className="chip" />}
+          <p className="muted small">Pro: 25–150%.</p>
         </div>
       </Popover>
       <button type="button" className="pill" disabled title="Pitch control is planned for Pro">
         Pitch <b className="mono">0</b>
-      </button>
+      </button></> : <ProUpgradeButton label="Practice tools · Pro" className="pill" />}
       <Popover
         label="Tempo"
         trigger={() => (
@@ -77,7 +76,7 @@ export function TransportBar(p: Props) {
       >
         {p.tempoEditor}
       </Popover>
-      <button type="button" className="pill" aria-pressed={p.click} onClick={p.onClick}>
+      {plan === 'pro' && <><button type="button" className="pill" aria-pressed={p.click} onClick={p.onClick}>
         <Metronome size={16} /> Click
       </button>
       <button type="button" className="pill" aria-pressed={p.countIn} onClick={p.onCountIn}>
@@ -90,7 +89,7 @@ export function TransportBar(p: Props) {
         <span className="muted">Synth</span>
         <input type="range" min={0} max={100} value={Math.round(p.mix * 100)} aria-label="Synth to song balance" disabled={!p.hasRecording} onChange={e => p.onMix(Number(e.target.value) / 100)} />
         <span className="muted">Song</span>
-      </div>
+      </div></>}
     </div>
   );
 }

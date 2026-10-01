@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { canUseSpeedTrainer, clampSpeed, printsFooter, speedPresets, speedRange } from './plan';
 
 describe('plan rules (the server decides the plan, D-010; these only shape the UI)', () => {
-  it('slows down to 50% and plays at most at normal speed on the free plan', () => {
-    expect(speedRange('free')).toEqual([0.5, 1]);
-    expect(clampSpeed('free', 0.25)).toBe(0.5);
+  it('keeps free playback at normal speed', () => {
+    expect(speedRange('free')).toEqual([1, 1]);
+    expect(clampSpeed('free', 0.25)).toBe(1);
     expect(clampSpeed('free', 1.4)).toBe(1);
   });
 
