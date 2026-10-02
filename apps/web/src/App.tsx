@@ -11,6 +11,9 @@ import { ConflictDialog, ImportReport, Tutorial } from './ui/Dialogs';
 // alphaTab (renderer, synth, importers) is several MB: load it only when a score opens,
 // so the score list appears right away.
 const Editor = lazy(() => import('./screens/Editor').then(m => ({ default: m.Editor })));
+const SharedScore = lazy(() => import('./screens/SharedScore').then(m => ({ default: m.SharedScore })));
+
+const shareFromHash = () => window.location.hash.match(/^#\/share\/([A-Za-z0-9_-]{43})$/)?.[1] ?? null;
 
 const SAVE_LABEL: Record<SaveStatus, string> = {
   idle: '',
@@ -31,7 +34,14 @@ export function App() {
   const [tutorial, setTutorial] = useState(false);
   const [conflict, setConflict] = useState<SyncConflict | null>(null);
   const [fatal, setFatal] = useState<string | null>(null);
+  const [shareToken, setShareToken] = useState<string | null>(shareFromHash);
   const unsubscribe = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    const changed = () => setShareToken(shareFromHash());
+    window.addEventListener('hashchange', changed);
+    return () => window.removeEventListener('hashchange', changed);
+  }, []);
 
   const refresh = useCallback(async (pp: Persistence) => {
     setScores(await pp.scores.list());
@@ -166,7 +176,11 @@ export function App() {
 
   return (
     <>
-      {store ? (
+      {shareToken ? (
+        <Suspense fallback={<div className="editor-loading">Opening shared score…</div>}>
+          <SharedScore token={shareToken} onBack={() => { window.location.hash = ''; setShareToken(null); }} />
+        </Suspense>
+      ) : store ? (
         <Suspense fallback={<div className="editor-loading">Loading the editor…</div>}>
           <Editor
             key={store.state.score.id}

@@ -29,6 +29,13 @@
       "when": 1790743529409,
       "tag": "0003_entitlements_checks",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790835053588,
+      "tag": "0004_dry_supreme_intelligence",
+      "breakpoints": true
     }
   ]
 }

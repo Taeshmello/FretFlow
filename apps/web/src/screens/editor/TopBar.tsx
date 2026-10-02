@@ -16,6 +16,7 @@ interface Props {
   onUndo: () => void;
   onRedo: () => void;
   onExport: () => void;
+  onShare: () => void;
   onBack: () => void;
   /** Sign-in / account button (absent in local-only builds). */
   account?: React.ReactNode;
@@ -53,8 +54,8 @@ export function TopBar(p: Props) {
           <Download size={17} /><span>Export</span>
         </button>
         {p.account}
-        <button type="button" className="btn primary share-trigger" disabled title="Sharing is coming in a later version">
-          <Share2 size={18} /> Share
+        <button type="button" className="btn primary share-trigger" aria-label="Share" onClick={p.onShare} title="Create a read-only link">
+          <Share2 size={18} /><span>Share</span>
         </button>
       </div>
     </header>

@@ -18,6 +18,8 @@ export type { AudioLimits };
 import { healthRoutes } from './routes/health.ts';
 import { meRoutes } from './routes/me.ts';
 import { scoreRoutes } from './routes/scores.ts';
+import { ownerShareRoutes, publicShareRoutes } from './routes/share.ts';
+import { practiceRoutes } from './routes/practice.ts';
 
 export interface RateLimits {
   /** Every authenticated request, per user. */
@@ -32,6 +34,8 @@ export interface RateLimits {
   passwordEmail: RateLimiter;
   /** POST /api/audio/upload-url, per user. */
   audioUpload: RateLimiter;
+  /** Public unlisted score reads, per client IP. */
+  shareView: RateLimiter;
 }
 
 export function defaultRateLimits(): RateLimits {
@@ -42,6 +46,7 @@ export function defaultRateLimits(): RateLimits {
     signUp: createMemoryRateLimiter({ max: 5, windowMs: 10 * 60_000 }),
     passwordEmail: createMemoryRateLimiter({ max: 10, windowMs: 10 * 60_000 }),
     audioUpload: createMemoryRateLimiter({ max: 30, windowMs: 60_000 }),
+    shareView: createMemoryRateLimiter({ max: 120, windowMs: 60_000 }),
   };
 }
 
@@ -61,7 +66,7 @@ export interface AppDeps {
 
 /** The only routes reachable without a session (BACKEND.md §6.1). */
 function isPublicPath(path: string): boolean {
-  return path === '/api/health' || path.startsWith('/api/auth/');
+  return path === '/api/health' || path.startsWith('/api/auth/') || path.startsWith('/api/share/');
 }
 
 function clientIp(c: Context, header: string | undefined): string {
@@ -128,6 +133,11 @@ export function createApp(deps: AppDeps) {
   );
 
   app.route('/api/health', healthRoutes(db));
+  app.use('/api/share/*', async (c, next) => {
+    enforceLimit(c, limits.shareView, `ip:${clientIp(c, deps.clientIpHeader)}`);
+    await next();
+  });
+  app.route('/api/share', publicShareRoutes(db));
 
   app.post('/api/auth/sign-in/*', async (c, next) => {
     enforceLimit(c, limits.signIn, `ip:${clientIp(c, deps.clientIpHeader)}`);
@@ -168,6 +178,8 @@ export function createApp(deps: AppDeps) {
 
   app.route('/api/me', meRoutes(db));
   app.route('/api/scores', scoreRoutes(db));
+  app.route('/api/scores', ownerShareRoutes(db));
+  app.route('/api/scores', practiceRoutes(db));
   app.route('/api/scores', syncMapRoutes(db));
   app.route('/api/audio', audioRoutes(db, deps.storage, limits.audioUpload, audioLimits));
 

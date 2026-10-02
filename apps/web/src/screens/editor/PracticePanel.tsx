@@ -108,7 +108,7 @@ export function PracticePanel(p: Props) {
       ) : (<>
         <div className="trainer-head"><h4>Practice routine</h4><span className="plan-badge pro">Pro</span></div>
         <div className="trainer-controls">
-          <p className="muted small">Saved in this browser for this account and score. Select bars, then save a passage. Start the routine and press Play; each target advances to the next passage.</p>
+          <p className="muted small">Saved in this browser and synced across your devices when online. Select bars, save a passage, then start the routine and press Play.</p>
           <label>Passage name
             <input aria-label="Passage name" maxLength={60} value={sectionName} placeholder={loopText} onChange={e => setSectionName(e.target.value)} />
           </label>
@@ -122,6 +122,10 @@ export function PracticePanel(p: Props) {
             if (p.routine.add(sectionName, bars, targetReps)) setSectionName('');
           }}>Save passage</button>
           {p.routine.error && <p className="small banner error" role="alert">{p.routine.error}</p>}
+          {p.routine.conflict && <div className="practice-section-actions">
+            <button type="button" className="btn" onClick={() => void p.routine.resolveConflict('local')}>Keep this device</button>
+            <button type="button" className="btn" onClick={() => void p.routine.resolveConflict('cloud')}>Use cloud version</button>
+          </div>}
           {p.routine.sections.length > 0 && (
             <>
               <button type="button" className="btn primary" onClick={() => p.routine.activeId ? p.routine.stop() : p.routine.start()}>

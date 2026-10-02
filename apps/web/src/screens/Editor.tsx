@@ -12,6 +12,7 @@ import { useRecording } from '../audio/useRecording';
 import { WaveformCard } from '../audio/WaveformCard';
 import { ExportDialog, HelpDialog } from '../ui/Dialogs';
 import { ProUpgradeDialog } from '../ui/ProUpgrade';
+import { ShareDialog } from '../ui/ShareDialog';
 import { usePlan } from '../app/session';
 import { Fretboard, KeyboardHints } from '../ui/Fretboard';
 import { NotePanel } from '../ui/NotePanel';
@@ -48,6 +49,7 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
   const [octave, setOctave] = useState(4);
   const [dialog, setDialog] = useState<'export' | 'help' | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const convertedRef = useRef<Converted | null>(null);
   const onConverted = useCallback((c: Converted) => {
     convertedRef.current = c;
@@ -87,7 +89,7 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
     seek: seekSynth,
   });
   const practiceEnabled = plan === 'pro';
-  const useRecordingPlayback = practiceEnabled && recording.loaded;
+  const useRecordingPlayback = practiceEnabled && recording.loaded && playback.pitch === 0;
   useEffect(() => {
     if (!practiceEnabled) {
       setMode('write');
@@ -96,6 +98,7 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
       recording.setMetronome(false);
       playback.setLoopRange(null, null, null);
       playback.update({ metronome: false, countIn: false, speed: 1 });
+      playback.setPitch(0);
     }
     // Only react to entitlement changes, not to each player state update.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -282,6 +285,7 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
         onUndo={() => dispatch({ type: 'undo' })}
         onRedo={() => dispatch({ type: 'redo' })}
         onExport={() => setDialog('export')}
+        onShare={() => setShareOpen(true)}
         onBack={onBack}
         account={account}
       />
@@ -299,6 +303,12 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
         onLoop={toggleLoop}
         speed={useRecordingPlayback ? recording.rate : playback.state.speed}
         onSpeed={trainer.onUserSpeed}
+        pitch={playback.pitch}
+        onPitch={semitones => {
+          if (!practiceEnabled) return;
+          if (recording.playing) recording.pause();
+          playback.setPitch(semitones);
+        }}
         tempo={tempo}
         tempoEditor={<TempoSettings editor={editor} dispatch={dispatch} />}
         click={useRecordingPlayback ? recording.metronome : playback.state.metronome}
@@ -364,6 +374,7 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
       {mode === 'write' && <TouchInput editor={editor} dispatch={dispatch} octave={octave} onOctave={setOctave} />}
       {dialog === 'help' && <HelpDialog onClose={() => setDialog(null)} />}
       {upgradeOpen && <ProUpgradeDialog onClose={() => setUpgradeOpen(false)} />}
+      {shareOpen && <ShareDialog scoreId={editor.score.id} isCover={editor.score.meta.composerType === 'cover'} onClose={() => setShareOpen(false)} />}
       {dialog === 'export' && (
         <ExportDialog
           barCount={editor.score.masterBars.length}

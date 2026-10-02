@@ -16,6 +16,8 @@ interface Props {
   onLoop: () => void;
   speed: number;
   onSpeed: (s: number) => void;
+  pitch: number;
+  onPitch: (semitones: number) => void;
   tempo: number;
   tempoEditor: ReactNode;
   click: boolean;
@@ -63,9 +65,14 @@ export function TransportBar(p: Props) {
           <p className="muted small">Pro: 25–150%.</p>
         </div>
       </Popover>
-      <button type="button" className="pill" disabled title="Pitch control is planned for Pro">
-        Pitch <b className="mono">0</b>
-      </button></> : <ProUpgradeButton label="Practice tools · Pro" className="pill" />}
+      <Popover label="Pitch" trigger={() => <button type="button" className="pill">Pitch <b className="mono">{p.pitch > 0 ? `+${p.pitch}` : p.pitch}</b></button>}>
+        <div className="settings">
+          <h4>Synth pitch · semitones</h4>
+          <input type="range" min={-12} max={12} step={1} value={p.pitch} aria-label="Synth pitch semitones" onChange={e => p.onPitch(Number(e.target.value))} />
+          <div className="chips"><button type="button" className="chip" onClick={() => p.onPitch(0)}>Reset to 0</button></div>
+          <p className="muted small">Changes score playback only, not the written notes or an uploaded recording. Shifted playback uses synth only.</p>
+        </div>
+      </Popover></> : <ProUpgradeButton label="Practice tools · Pro" className="pill" />}
       <Popover
         label="Tempo"
         trigger={() => (

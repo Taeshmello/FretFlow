@@ -78,12 +78,17 @@ export const scores = pgTable(
     title: text('title').notNull(),
     composerType: text('composer_type', { enum: ['original', 'cover', 'public_domain'] }).notNull(),
     snapshot: jsonb('snapshot').notNull(),
+    /** SHA-256 of an unlisted read-only link token; never store the bearer token. */
+    shareTokenHash: text('share_token_hash'),
+    /** Private Pro practice data, kept outside the shared score snapshot. */
+    practiceSections: jsonb('practice_sections').notNull().default(sql`'[]'::jsonb`),
+    practiceRev: integer('practice_rev').notNull().default(0),
     rev: integer('rev').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
-  t => [index('scores_owner_id_idx').on(t.ownerId)],
+  t => [index('scores_owner_id_idx').on(t.ownerId), unique('scores_share_token_hash_uq').on(t.shareTokenHash)],
 );
 
 export const audioAssets = pgTable(

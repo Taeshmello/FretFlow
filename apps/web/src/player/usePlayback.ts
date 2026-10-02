@@ -36,6 +36,15 @@ const INITIAL: PlaybackState = {
 /** alphaSynth transport (D-016). */
 export function usePlayback(api: alphaTab.AlphaTabApi | null) {
   const [state, setState] = useState<PlaybackState>(INITIAL);
+  /** Live playback-only transposition; never changes the written score. */
+  const [pitch, setPitchState] = useState(0);
+
+  const setPitch = useCallback((semitones: number) => {
+    const next = Math.max(-12, Math.min(12, Math.round(semitones)));
+    setPitchState(next);
+    const tracks = api?.score?.tracks.filter(t => !t.staves.some(s => s.isPercussion)) ?? [];
+    if (tracks.length) api?.changeTrackTranspositionPitch(tracks, next);
+  }, [api]);
 
   useEffect(() => {
     if (!api) {
@@ -136,8 +145,10 @@ export function usePlayback(api: alphaTab.AlphaTabApi | null) {
       if (tracks.length) {
         api.changeTrackMute(tracks, true);
       }
+      const pitched = score.tracks.filter(t => !t.staves.some(s => s.isPercussion));
+      if (pitched.length && pitch !== 0) api.changeTrackTranspositionPitch(pitched, pitch);
     });
-  }, [api, muted]);
+  }, [api, muted, pitch]);
 
   /** A-B loop over our beats; null clears it. */
   const setLoopRange = useCallback(
@@ -159,5 +170,5 @@ export function usePlayback(api: alphaTab.AlphaTabApi | null) {
     [api, update],
   );
 
-  return { state, update, playPause, stop, setLoopRange, muted, toggleMute, playFromTick, pause };
+  return { state, update, playPause, stop, setLoopRange, muted, toggleMute, playFromTick, pause, pitch, setPitch };
 }
