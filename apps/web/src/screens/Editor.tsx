@@ -1,33 +1,25 @@
-import { cursorBeat, cursorTrack, selectionRange, beatsInRange } from '@fretflow/editor-core';
-import { loopFromBars } from '@fretflow/audio-engine';
+import { cursorTrack } from '@fretflow/editor-core';
 import type { Converted } from '@fretflow/render';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { exportAsGp, exportAsJson, exportAsMidi, printScore } from '../app/files';
 import { useEditor, type EditorStore } from '../app/store';
-import { track as trackEvent } from '../app/telemetry';
-import { isTextTarget, mapKey } from '../keymap';
-import { usePlayback } from '../player/usePlayback';
 import { useAlphaTab, type ViewMode } from '../score/useAlphaTab';
-import { useRecording } from '../audio/useRecording';
 import { WaveformCard } from '../audio/WaveformCard';
 import { ExportDialog, HelpDialog } from '../ui/Dialogs';
 import { ProUpgradeDialog } from '../ui/ProUpgrade';
 import { ShareDialog } from '../ui/ShareDialog';
-import { usePlan } from '../app/session';
 import { Fretboard, KeyboardHints } from '../ui/Fretboard';
 import { NotePanel } from '../ui/NotePanel';
 import { PianoKeyboard } from '../ui/PianoKeyboard';
 import { DrumPad } from '../ui/DrumPad';
-import { previewDrum, previewPitch } from '../audio/preview';
 import { TempoSettings } from '../ui/Settings';
 import { ScoreCard } from './editor/ScoreCard';
 import { TopBar, type Mode } from './editor/TopBar';
-import { useSpeed } from '../player/useSpeed';
-import { useSpeedTrainer } from '../player/useSpeedTrainer';
-import { usePracticeRoutine } from '../player/usePracticeRoutine';
 import { TransportBar } from './editor/TransportBar';
 import { TouchInput } from './editor/TouchInput';
 import { PracticePanel } from './editor/PracticePanel';
+import { useEditorKeys } from './editor/useEditorKeys';
+import { usePracticeControls } from './editor/usePracticeControls';
 
 interface Props {
   store: EditorStore;
@@ -41,12 +33,8 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
   const { editor, audition } = useEditor(store);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { containerRef, api, error } = useAlphaTab(scrollRef);
-  const playback = usePlayback(api);
-  const plan = usePlan();
   const [viewMode, setViewMode] = useState<ViewMode>('scoreTab');
   const [mode, setMode] = useState<Mode>('write');
-  /** Octave the piano letter keys type into (4 = middle C). */
-  const [octave, setOctave] = useState(4);
   const [dialog, setDialog] = useState<'export' | 'help' | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -56,9 +44,10 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
   }, []);
   const dispatch = store.dispatch;
 
-  useEffect(() => {
-    playback.update({ looping: false });
-  }, [editor.score, playback.update]);
+  const practice = usePracticeControls({ store, editor, api, mode, setMode, converted: convertedRef });
+  const { playback, recording, practiceEnabled, useRecordingPlayback, trainer } = practice;
+  const openHelp = useCallback(() => setDialog('help'), []);
+  const { octave, setOctave } = useEditorKeys({ store, dialogOpen: dialog !== null, onPlayPause: practice.playPause, onHelp: openHelp });
 
   // Dev-only handle for latency benchmarks (CLAUDE.md performance budget).
   useEffect(() => {
@@ -67,207 +56,9 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
     }
   }, [api, store]);
 
-  const playPause = useCallback(() => {
-    const beat = cursorBeat(store.state.score, store.state.cursor);
-    playback.playPause(beat ? convertedRef.current?.beats.get(beat.id) ?? null : null);
-  }, [playback, store]);
-
-  const getSynthTick = useCallback(() => api?.tickPosition ?? 0, [api]);
-  const seekSynth = useCallback(
-    (tick: number) => {
-      if (api) {
-        api.tickPosition = tick;
-      }
-    },
-    [api],
-  );
-  const recording = useRecording(editor.score.id, editor.score, {
-    setVolume: v => playback.update({ volume: v }),
-    play: playback.playFromTick,
-    pause: playback.pause,
-    getTick: getSynthTick,
-    seek: seekSynth,
-  });
-  const practiceEnabled = plan === 'pro';
-  const useRecordingPlayback = practiceEnabled && recording.loaded && playback.pitch === 0;
-  useEffect(() => {
-    if (!practiceEnabled) {
-      setMode('write');
-      recording.pause();
-      recording.setLoop(null);
-      recording.setMetronome(false);
-      playback.setLoopRange(null, null, null);
-      playback.update({ metronome: false, countIn: false, speed: 1 });
-      playback.setPitch(0);
-    }
-    // Only react to entitlement changes, not to each player state update.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [practiceEnabled]);
-  const setSpeed = useSpeed({
-    speed: useRecordingPlayback ? recording.rate : playback.state.speed,
-    setRecordingRate: recording.setRate,
-    setRecordingRange: recording.setRateRange,
-    setSynthSpeed: speed => playback.update({ speed }),
-  });
-
-  const loopSelection = useCallback(() => {
-    if (!practiceEnabled) return;
-    const { selection, score, cursor } = store.state;
-    if (playback.state.looping) {
-      playback.setLoopRange(null, null, null);
-      return;
-    }
-    const range = selectionRange(selection ?? { anchor: { ...cursor, beatIndex: 0 }, head: { ...cursor, beatIndex: 1e9 } });
-    const beats = beatsInRange(score, range);
-    if (beats.length) {
-      trackEvent('loop_used', { source: 'synth' });
-      playback.setLoopRange(convertedRef.current, beats[0].beat, beats[beats.length - 1].beat);
-    }
-  }, [playback, store, practiceEnabled]);
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (dialog || isTextTarget(e.target) || document.querySelector('dialog[open]')) {
-        return;
-      }
-      const { score, cursor } = store.state;
-      const track = cursorTrack(score, cursor);
-      const result = mapKey(e, { instrument: track.instrument, octave });
-      if (!result) {
-        return;
-      }
-      e.preventDefault();
-      if ('command' in result) {
-        const c = result.command;
-        // Hear a key or drum as it is added, like the guitar audition.
-        const beat = cursorBeat(score, cursor);
-        if (c.type === 'togglePitch' && !beat?.keys?.some(k => k.pitch === c.pitch)) {
-          previewPitch(c.pitch, 'piano');
-        } else if (c.type === 'toggleHit' && !beat?.hits?.some(h => h.piece === c.piece)) {
-          previewDrum(c.piece);
-        }
-        dispatch(c);
-        return;
-      }
-      switch (result.shell) {
-        case 'playPause':
-          playPause();
-          break;
-        case 'help':
-          setDialog('help');
-          break;
-        case 'escape':
-          dispatch({ type: 'select', selection: null });
-          break;
-        case 'octaveUp':
-          setOctave(o => Math.min(7, o + 1));
-          break;
-        case 'octaveDown':
-          setOctave(o => Math.max(1, o - 1));
-          break;
-        case 'save':
-          break;
-      }
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [dispatch, dialog, playPause, octave, store]);
-
-  const sel = editor.selection ? selectionRange(editor.selection) : null;
-  const selectedBars: [number, number] | null = sel ? [sel.from.barIndex + 1, sel.to.barIndex + 1] : null;
   const tempo = editor.score.masterBars[editor.cursor.barIndex]?.tempo ?? editor.score.masterBars[0]?.tempo ?? 120;
-  const loopLabel = selectedBars
-    ? `Loop bars ${selectedBars[0]}${selectedBars[1] === selectedBars[0] ? '' : `–${selectedBars[1]}`}`
-    : playback.state.looping || recording.loop
-      ? 'Loop active'
-      : null;
-  const looping = useRecordingPlayback ? !!recording.loop : playback.state.looping;
-  const playbackRange = api?.playbackRange;
-  const loopKey = useRecordingPlayback
-    ? recording.loop ? `audio:${recording.loop.start}:${recording.loop.end}` : ''
-    : playbackRange ? `synth:${playbackRange.startTick}:${playbackRange.endTick}` : '';
-  const trainer = useSpeedTrainer({
-    enabled: practiceEnabled && mode === 'practice',
-    looping,
-    loopKey,
-    loopCount: useRecordingPlayback ? recording.loopCount : playback.state.loopCount,
-    setSpeed,
-  });
-  const applyPracticeLoop = (bars: [number, number] | null) => {
-    if (!practiceEnabled) return;
-    if (recording.loaded) {
-      if (!bars) {
-        recording.setLoop(null);
-      } else {
-        const region = loopFromBars(recording.map, recording.tempo, bars[0] - 1, bars[1] - 1);
-        recording.setLoop(region);
-        if (region) recording.seek(region.start);
-      }
-      return;
-    }
-    if (!bars) {
-      playback.setLoopRange(null, null, null);
-      return;
-    }
-    const track = editor.score.tracks.find(t => t.id === editor.cursor.trackId);
-    const beats = track?.bars.slice(bars[0] - 1, bars[1]).flatMap(bar => bar.beats) ?? [];
-    const first = beats[0];
-    const last = beats[beats.length - 1];
-    if (first && last) {
-      playback.setLoopRange(convertedRef.current, first, last);
-      const rendered = convertedRef.current?.beats.get(first.id);
-      if (api && rendered) api.tickPosition = rendered.absolutePlaybackStart;
-    }
-  };
-  const routine = usePracticeRoutine({
-    scoreId: editor.score.id,
-    barCount: editor.score.masterBars.length,
-    loopCount: useRecordingPlayback ? recording.loopCount : playback.state.loopCount,
-    onLoopRange: applyPracticeLoop,
-  });
-  const fmt = (ms: number) => {
-    const seconds = Math.max(0, Math.floor(ms / 1000));
-    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-  };
-  const position = `Bar ${editor.cursor.barIndex + 1} · beat ${editor.cursor.beatIndex + 1}`;
   const activeTrack = cursorTrack(editor.score, editor.cursor);
   const stringInstrument = activeTrack.instrument === 'guitar' || activeTrack.instrument === 'bass';
-
-  function toggleLoop() {
-    if (!practiceEnabled) return;
-    if (recording.loaded) {
-      if (recording.loop) {
-        recording.setLoop(null);
-      } else {
-        const bars = selectedBars ?? [editor.cursor.barIndex + 1, editor.cursor.barIndex + 1];
-        recording.loopBars(bars[0] - 1, bars[1] - 1);
-      }
-      return;
-    }
-    loopSelection();
-  }
-
-
-  function toggleMetronome() {
-    if (!practiceEnabled) return;
-    if (recording.loaded) {
-      recording.setMetronome(!recording.metronome);
-    } else {
-      playback.update({ metronome: !playback.state.metronome });
-    }
-  }
-
-  function playMain() {
-    if (useRecordingPlayback) {
-      if (recording.playing) {
-        recording.pause();
-      } else {
-        recording.playTogether();
-      }
-      return;
-    }
-    playPause();
-  }
 
   return (
     <div className={`editor editor-v2 mode-${mode}`}>
@@ -295,24 +86,20 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
       <TransportBar
         playing={useRecordingPlayback ? recording.playing : playback.state.playing}
         ready={useRecordingPlayback || playback.state.ready}
-        position={useRecordingPlayback ? `${fmt(recording.time * 1000)} / ${fmt(recording.duration * 1000)}` : position}
-        onPlayPause={playMain}
-        loopLabel={loopLabel}
-        looping={looping}
-        canLoop={mode === 'practice' || !!selectedBars}
-        onLoop={toggleLoop}
+        position={practice.position}
+        onPlayPause={practice.playMain}
+        loopLabel={practice.loopLabel}
+        looping={practice.looping}
+        canLoop={mode === 'practice' || !!practice.selectedBars}
+        onLoop={practice.toggleLoop}
         speed={useRecordingPlayback ? recording.rate : playback.state.speed}
         onSpeed={trainer.onUserSpeed}
         pitch={playback.pitch}
-        onPitch={semitones => {
-          if (!practiceEnabled) return;
-          if (recording.playing) recording.pause();
-          playback.setPitch(semitones);
-        }}
+        onPitch={practice.setPitch}
         tempo={tempo}
         tempoEditor={<TempoSettings editor={editor} dispatch={dispatch} />}
         click={useRecordingPlayback ? recording.metronome : playback.state.metronome}
-        onClick={toggleMetronome}
+        onClick={practice.toggleMetronome}
         countIn={playback.state.countIn}
         onCountIn={() => playback.update({ countIn: !playback.state.countIn })}
         hasRecording={useRecordingPlayback}
@@ -360,13 +147,13 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
             speed={recording.loaded ? recording.rate : playback.state.speed}
             onSpeed={trainer.onUserSpeed}
             trainer={trainer}
-            routine={routine}
-            looping={looping}
-            loopBars={selectedBars}
+            routine={practice.routine}
+            looping={practice.looping}
+            loopBars={practice.selectedBars}
             currentBar={editor.cursor.barIndex + 1}
-            onLoop={toggleLoop}
+            onLoop={practice.toggleLoop}
             metronome={recording.loaded ? recording.metronome : playback.state.metronome}
-            onMetronome={toggleMetronome}
+            onMetronome={practice.toggleMetronome}
             hasRecording={recording.loaded}
           />
         ) : <NotePanel editor={editor} dispatch={dispatch} />}
@@ -378,7 +165,7 @@ export function Editor({ store, onBack, saveLabel, saveError, account }: Props) 
       {dialog === 'export' && (
         <ExportDialog
           barCount={editor.score.masterBars.length}
-          selection={selectedBars}
+          selection={practice.selectedBars}
           onClose={() => setDialog(null)}
           onPdf={o => api && printScore(api, o)}
           onMidi={() => exportAsMidi(editor.score)}
