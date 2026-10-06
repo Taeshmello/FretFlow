@@ -212,10 +212,6 @@ kbd {
   font-size: 13px;
 }
 
-.field.grow {
-  flex: 1;
-}
-
 .field-row {
   display: flex;
   gap: 8px;
@@ -431,51 +427,6 @@ kbd {
   border-bottom: 1px solid var(--line);
 }
 
-.title-edit {
-  display: flex;
-  gap: 6px;
-  align-items: baseline;
-  flex: 1;
-  min-width: 0;
-}
-
-.title-edit input {
-  border-color: transparent;
-  background: transparent;
-  font-weight: 700;
-  font-size: 16px;
-  width: min(360px, 40vw);
-}
-
-.title-edit input.artist {
-  font-weight: 400;
-  font-size: 13px;
-  color: var(--muted);
-  width: min(200px, 25vw);
-}
-
-.title-edit input:hover {
-  border-color: var(--line);
-}
-
-.save-status {
-  font-size: 12px;
-  color: var(--ok);
-  white-space: nowrap;
-}
-
-.save-status.is-error {
-  color: var(--danger);
-  font-weight: 600;
-}
-
-.where {
-  font-size: 12px;
-  color: var(--muted);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
 .toolbar {
   display: flex;
   gap: 10px;
@@ -484,56 +435,6 @@ kbd {
   border-bottom: 1px solid var(--line);
   flex-wrap: wrap;
   align-items: center;
-}
-
-.tool-group {
-  display: flex;
-  gap: 2px;
-  align-items: center;
-  padding-right: 10px;
-  border-right: 1px solid var(--line);
-}
-
-.tool-group.right {
-  margin-left: auto;
-  border-right: none;
-  gap: 6px;
-}
-
-.tool {
-  min-width: 32px;
-  height: 32px;
-  justify-content: center;
-  border-color: transparent;
-  background: transparent;
-  padding: 0 6px;
-  font-size: 15px;
-}
-
-.tool.text {
-  font-size: 12px;
-}
-
-.tool.dur {
-  font-size: 13px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.tool:hover:not(:disabled) {
-  background: var(--bg);
-}
-
-.tool[aria-pressed='true'] {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-}
-
-.tool.play {
-  background: var(--accent);
-  color: var(--accent-ink);
-  border-radius: 50%;
-  width: 34px;
 }
 
 .time {
@@ -624,12 +525,6 @@ kbd {
   background: var(--over);
 }
 
-.bar-under {
-  position: absolute;
-  background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.12) 0 2px, transparent 2px 5px);
-  border-radius: 2px;
-}
-
 /* alphaTab's own playback cursor */
 .at-cursor-bar {
   background: rgba(64, 120, 210, 0.08);
@@ -649,64 +544,12 @@ kbd {
   background: rgba(64, 120, 210, 0.12);
 }
 
-.inspector {
-  width: 290px;
-  flex-shrink: 0;
-  overflow-y: auto;
-  border-left: 1px solid var(--line);
-  background: var(--panel);
-  padding: 4px 14px 20px;
-}
-
-.inspector section {
-  border-bottom: 1px solid var(--line);
-  padding: 10px 0 12px;
-}
-
-.inspector h3 {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-  margin: 4px 0 8px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.inspector .big {
-  font-size: 18px;
-  font-weight: 650;
-  margin: 0 0 8px;
-}
-
-.inspector .big small {
-  font-weight: 400;
-  color: var(--muted);
-  font-size: 12px;
-}
-
 .fill {
   font-size: 11px;
   text-transform: none;
   letter-spacing: 0;
   padding: 1px 6px;
   border-radius: 10px;
-}
-
-.fill-full {
-  background: #e3f3e7;
-  color: var(--ok);
-}
-
-.fill-under {
-  background: #eee;
-  color: var(--muted);
-}
-
-.fill-over {
-  background: #fde7e5;
-  color: var(--danger);
 }
 
 .chips {
@@ -753,30 +596,6 @@ kbd {
 }
 
 /* ---------- dock: fretboard + audio ---------- */
-.dock {
-  border-top: 1px solid var(--line);
-  background: var(--panel);
-  max-height: 40vh;
-  overflow-y: auto;
-}
-
-.dock-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 4px 14px;
-}
-
-.dock-tabs button {
-  font-size: 12px;
-  padding: 3px 10px;
-  border-radius: 14px;
-}
-
-.dock-tabs button[aria-pressed='true'] {
-  background: var(--ink);
-  color: var(--panel);
-  border-color: var(--ink);
-}
 
 .fretboard {
   padding: 2px 14px 10px;
@@ -820,31 +639,6 @@ kbd {
 .fb-hint-passing { background: #e4ac31; }
 .fb-hint-tension { background: #dc5e54; }
 
-.fb-grid {
-  display: grid;
-  min-width: 720px;
-  row-gap: 2px;
-}
-
-.fb-fretno,
-.fb-marker {
-  text-align: center;
-  font-size: 10px;
-  color: var(--muted);
-}
-
-.fb-open {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
-  display: flex;
-  align-items: center;
-}
-
-.fb-open.is-cursor {
-  color: var(--accent);
-}
-
 .fb-cell {
   height: 24px;
   border: none;
@@ -857,30 +651,10 @@ kbd {
   font-weight: 700;
 }
 
-.fb-cell.is-open {
-  border-right: 5px solid #5b574e;
-}
-
 .fb-cell:hover {
   background: linear-gradient(to bottom, transparent 11px, #9e978a 11px 13px, transparent 13px), var(--accent-soft);
 }
 
-.fb-cell.is-played {
-  color: #fff;
-  background: radial-gradient(circle, var(--accent) 0 10px, transparent 10.5px),
-    linear-gradient(to bottom, transparent 11px, #9e978a 11px 13px, transparent 13px);
-}
-
-.fb-cell.is-same {
-  color: var(--accent);
-  font-size: 18px;
-}
-
-.audio-panel {
-  padding: 8px 14px 14px;
-}
-
-.audio-controls,
 .beatmap {
   display: flex;
   gap: 8px;
@@ -891,13 +665,6 @@ kbd {
 
 .beatmap input[type='number'] {
   width: 64px;
-}
-
-.file-name {
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .waveform {
@@ -944,22 +711,6 @@ kbd {
 .modal-body {
   padding: 12px 18px 18px;
   line-height: 1.5;
-}
-
-.export-block {
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 12px;
-  margin-bottom: 12px;
-}
-
-.export-block:last-child {
-  border: none;
-  margin: 0;
-}
-
-.export-block h3 {
-  font-size: 13px;
-  margin: 0 0 8px;
 }
 
 .shortcuts {
@@ -1023,15 +774,6 @@ kbd {
   justify-content: space-between;
   padding: 5px 0;
   border-bottom: 1px solid var(--line);
-}
-
-@media (max-width: 900px) {
-  .inspector {
-    display: none;
-  }
-  .where {
-    display: none;
-  }
 }
 
 /* ---------- FretFlow design draft: editor shell ---------- */
