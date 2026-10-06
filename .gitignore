@@ -42,3 +42,6 @@ apps/web/public/soundfont/
 
 # Session handoff notes (not tracked)
 HANDOFF_CLAUDE*.txt
+
+# Design draft (local reference only)
+/FretFlow 디자인 초안.pdf
