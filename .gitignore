@@ -39,3 +39,6 @@ docs/
 # alphaTab Vite 플러그인이 복사하는 폰트·사운드폰트
 apps/web/public/font/
 apps/web/public/soundfont/
+
+# Session handoff notes (not tracked)
+HANDOFF_CLAUDE*.txt
