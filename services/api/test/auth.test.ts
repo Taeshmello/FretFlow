@@ -105,6 +105,20 @@ describe('magic link sign-in', () => {
     expect(email.sent).toHaveLength(6);
   });
 
+  it('shares the IP sign-in budget across magic links and passwords', async () => {
+    const { request } = buildTestApp(db, {
+      rateLimits: { signIn: createMemoryRateLimiter({ max: 1, windowMs: 60_000 }) },
+    });
+    expect((await request('/api/auth/sign-in/magic-link', {
+      method: 'POST', headers: { 'x-test-ip': '203.0.113.7' }, body: JSON.stringify({ email: 'ana@example.com' }),
+    })).status).toBe(200);
+    const blocked = await request('/api/auth/sign-in/email', {
+      method: 'POST', headers: { 'x-test-ip': '203.0.113.7' }, body: JSON.stringify({ email: 'ana@example.com', password: 'wrong password!' }),
+    });
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get('retry-after')).toBeTruthy();
+  });
+
   it('limits magic links to 3 per 10 minutes per email address, whatever the IP or letter case', async () => {
     const { request, email } = buildTestApp(db, {
       rateLimits: { signInEmail: createMemoryRateLimiter({ max: 3, windowMs: 10 * 60_000 }) },
@@ -133,6 +147,20 @@ describe('magic link sign-in', () => {
     });
     const headers = [...res.headers.entries()].map(([k, v]) => `${k}: ${v}`).join('\n');
     expect(headers).not.toContain('ana@example.com');
+  });
+});
+
+describe('public share guard', () => {
+  it('allows a public share request without a session and limits reads per IP', async () => {
+    const { request } = buildTestApp(db, {
+      rateLimits: { shareView: createMemoryRateLimiter({ max: 1, windowMs: 60_000 }) },
+    });
+    const read = (ip: string) => request('/api/share/invalid-token', { headers: { 'x-test-ip': ip } });
+    expect((await read('203.0.113.1')).status).toBe(400);
+    const blocked = await read('203.0.113.1');
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get('retry-after')).toBeTruthy();
+    expect((await read('203.0.113.2')).status).toBe(400);
   });
 });
 
