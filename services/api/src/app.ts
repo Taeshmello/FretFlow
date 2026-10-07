@@ -12,7 +12,7 @@ import type { Logger } from './lib/logger.ts';
 import { createMemoryRateLimiter, type RateLimiter } from './lib/rate-limit.ts';
 import { MAX_SNAPSHOT_BYTES } from './lib/score-snapshot.ts';
 import type { ObjectStorage } from './lib/storage.ts';
-import { audioRoutes, DEFAULT_AUDIO_LIMITS, syncMapRoutes, type AudioLimits } from './routes/audio.ts';
+import { audioRoutes, DEFAULT_AUDIO_LIMITS, type AudioLimits } from './routes/audio.ts';
 
 export type { AudioLimits };
 import { healthRoutes } from './routes/health.ts';
@@ -20,6 +20,7 @@ import { meRoutes } from './routes/me.ts';
 import { scoreRoutes } from './routes/scores.ts';
 import { ownerShareRoutes, publicShareRoutes } from './routes/share.ts';
 import { practiceRoutes } from './routes/practice.ts';
+import { syncMapRoutes } from './routes/sync-maps.ts';
 
 export interface RateLimits {
   /** Every authenticated request, per user. */

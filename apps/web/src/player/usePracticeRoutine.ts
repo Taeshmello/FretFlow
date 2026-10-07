@@ -4,27 +4,13 @@ import { API_URL, persistence } from '../app/persistence';
 import { useMe, usePlan } from '../app/session';
 import { advanceRoutine, readPracticeSections, type PracticeSection } from './practiceRoutine';
 import { loadRemotePractice, PracticeConflict, saveRemotePractice } from './practiceRemote';
+import { loadPracticeState, type CachedPractice } from './practicePersistence';
 
 interface Inputs {
   scoreId: string;
   barCount: number;
   loopCount: number;
   onLoopRange: (bars: [number, number] | null) => void;
-}
-
-interface CachedPractice { sections: PracticeSection[]; rev: number; dirty: boolean }
-
-function readCache(value: unknown, barCount: number): CachedPractice {
-  if (Array.isArray(value)) {
-    const sections = readPracticeSections(value, barCount);
-    return { sections, rev: 0, dirty: sections.length > 0 };
-  }
-  const raw = value as Partial<CachedPractice> | null;
-  return {
-    sections: readPracticeSections(raw?.sections, barCount),
-    rev: typeof raw?.rev === 'number' && Number.isInteger(raw.rev) && raw.rev >= 0 ? raw.rev : 0,
-    dirty: raw?.dirty === true,
-  };
 }
 
 /** Pro-only saved practice, local first and synchronized to the user's private server row. */
@@ -90,45 +76,16 @@ export function usePracticeRoutine({ scoreId, barCount, loopCount, onLoopRange }
     setActiveId(null);
     setRepetitions(0);
     void (async () => {
-      const p = await persistence(() => {});
-      const cache = readCache(await p.media.getPref<unknown>(key), barCount);
-      if (!alive || activeKey.current !== key) return;
-      let next = cache.sections;
-      remoteRev.current = cache.rev;
-      dirty.current = cache.dirty;
-      let loadError: string | null = null;
-      if (onlinePro && navigator.onLine) {
-        try {
-          await p.saver.flush();
-          const result = await p.sync?.pushDirty();
-          if (!alive || activeKey.current !== key) return;
-          if (result?.conflicts.some(c => c.scoreId === scoreId) || result?.failed.some(f => f.scoreId === scoreId)) {
-            throw new Error('Sync this score before syncing practice.');
-          }
-          const cloud = await loadRemotePractice(scoreId);
-          if (!alive || activeKey.current !== key) return;
-          if (cache.dirty) {
-            if (cache.rev !== cloud.rev) throw new PracticeConflict('Practice changed on another device. Choose which version to keep.');
-            const savedRev = await saveRemotePractice(scoreId, cache.sections, cloud.rev);
-            if (!alive || activeKey.current !== key) return;
-            remoteRev.current = savedRev;
-            dirty.current = false;
-          } else {
-            next = readPracticeSections(cloud.sections, barCount);
-            remoteRev.current = cloud.rev;
-          }
-          await p.media.setPref(key, { sections: next, rev: remoteRev.current, dirty: dirty.current } satisfies CachedPractice);
-        } catch (e) {
-          if (!alive || activeKey.current !== key) return;
-          if (e instanceof PracticeConflict) { blocked.current = true; if (alive) setConflict(true); }
-          loadError = e instanceof Error ? e.message : 'Practice could not be synced.';
-        }
-      }
-      if (!alive || activeKey.current !== key) return;
-      setSections(next);
-      sectionsRef.current = next;
+      const loaded = await loadPracticeState(key, scoreId, barCount, onlinePro, () => alive && activeKey.current === key);
+      if (!loaded) return;
+      remoteRev.current = loaded.rev;
+      dirty.current = loaded.dirty;
+      blocked.current = loaded.conflict;
+      setConflict(loaded.conflict);
+      setSections(loaded.sections);
+      sectionsRef.current = loaded.sections;
       setLoadedKey(key);
-      setError(loadError);
+      setError(loaded.error);
     })().catch(() => { if (alive) setError('Saved practice could not be loaded in this browser.'); });
     return () => { alive = false; };
   }, [key, barCount, onlinePro, scoreId]);
