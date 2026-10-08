@@ -6,6 +6,9 @@ const csv = z
   .transform(s => s.split(',').map(v => v.trim()).filter(Boolean))
   .pipe(z.array(z.url()).min(1));
 
+/** Docker Compose env files pass `KEY=` as an empty string; treat it as unset. */
+const optionalText = z.preprocess(v => (v === '' ? undefined : v), z.string().min(1).optional());
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
@@ -14,8 +17,8 @@ const envSchema = z.object({
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.url(),
   WEB_ORIGIN: csv,
-  GOOGLE_CLIENT_ID: z.string().min(1),
-  GOOGLE_CLIENT_SECRET: z.string().min(1),
+  GOOGLE_CLIENT_ID: optionalText,
+  GOOGLE_CLIENT_SECRET: optionalText,
   EMAIL_FROM: z.string().min(1),
   EMAIL_PROVIDER_API_KEY: z.string().min(1),
   /** Resend-compatible JSON endpoint: POST { from, to, subject, text, html }. */
@@ -23,11 +26,12 @@ const envSchema = z.object({
   S3_ENDPOINT: z.url(),
   S3_REGION: z.string().min(1),
   S3_BUCKET: z.string().min(1),
-  S3_ACCESS_KEY_ID: z.string().min(1),
-  S3_SECRET_ACCESS_KEY: z.string().min(1),
+  /** Optional on AWS: when both are absent, the SDK's default credential chain is used (for example an EC2 IAM role). */
+  S3_ACCESS_KEY_ID: optionalText,
+  S3_SECRET_ACCESS_KEY: optionalText,
   /** Force path-style bucket URLs (MinIO). R2 works with either. */
   S3_FORCE_PATH_STYLE: z.stringbool().default(false),
-  SENTRY_DSN: z.string().optional(),
+  SENTRY_DSN: optionalText,
   /** Per-user audio storage cap (default 2GB) and unfinished-upload cap. */
   AUDIO_QUOTA_BYTES: z.coerce.number().int().positive().default(2 * 1024 * 1024 * 1024),
   AUDIO_MAX_PENDING: z.coerce.number().int().positive().default(20),
@@ -43,6 +47,12 @@ const envSchema = z.object({
     .refine(v => v.length > 0 && v !== 'x-forwarded-for', 'must be a proxy-overwritten header, not x-forwarded-for')
     .optional(),
 }).superRefine((env, ctx) => {
+  if (Boolean(env.GOOGLE_CLIENT_ID) !== Boolean(env.GOOGLE_CLIENT_SECRET)) {
+    ctx.addIssue({ code: 'custom', path: ['GOOGLE_CLIENT_ID'], message: 'Google client id and secret must be set together' });
+  }
+  if (Boolean(env.S3_ACCESS_KEY_ID) !== Boolean(env.S3_SECRET_ACCESS_KEY)) {
+    ctx.addIssue({ code: 'custom', path: ['S3_ACCESS_KEY_ID'], message: 'S3 access key id and secret must be set together' });
+  }
   if (env.NODE_ENV === 'production' && !env.CLIENT_IP_HEADER) {
     ctx.addIssue({ code: 'custom', path: ['CLIENT_IP_HEADER'], message: 'required in production' });
   }

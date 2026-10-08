@@ -30,16 +30,43 @@ describe('loadEnv', () => {
     expect(env.PORT).toBe(3000);
   });
 
-  it('fails naming the missing keys without echoing any secret values', () => {
-    const { GOOGLE_CLIENT_SECRET: _omit, ...rest } = validEnv;
-    expect(() => loadEnv({ ...rest, BETTER_AUTH_SECRET: 'too-short' })).toThrow(
-      /BETTER_AUTH_SECRET.*GOOGLE_CLIENT_SECRET|GOOGLE_CLIENT_SECRET.*BETTER_AUTH_SECRET/,
-    );
+  it('fails naming invalid keys without echoing any secret values', () => {
+    expect(() => loadEnv({ ...validEnv, BETTER_AUTH_SECRET: 'too-short' })).toThrow(/BETTER_AUTH_SECRET/);
     try {
       loadEnv({ ...validEnv, BETTER_AUTH_SECRET: 'too-short' });
     } catch (err) {
       expect(String(err)).not.toContain('too-short');
     }
+  });
+
+  it('allows optional providers to be omitted but requires credential pairs', () => {
+    const {
+      GOOGLE_CLIENT_ID: _googleId,
+      GOOGLE_CLIENT_SECRET: _googleSecret,
+      S3_ACCESS_KEY_ID: _s3Id,
+      S3_SECRET_ACCESS_KEY: _s3Secret,
+      ...withoutProviderCredentials
+    } = validEnv;
+    const env = loadEnv(withoutProviderCredentials);
+    expect(env.GOOGLE_CLIENT_ID).toBeUndefined();
+    expect(env.S3_ACCESS_KEY_ID).toBeUndefined();
+    expect(() => loadEnv({ ...withoutProviderCredentials, GOOGLE_CLIENT_ID: 'id' })).toThrow(/GOOGLE_CLIENT_ID/);
+    expect(() => loadEnv({ ...withoutProviderCredentials, S3_ACCESS_KEY_ID: 'ak' })).toThrow(/S3_ACCESS_KEY_ID/);
+  });
+
+  it('treats empty optional values from a Compose env file as unset', () => {
+    const env = loadEnv({
+      ...validEnv,
+      GOOGLE_CLIENT_ID: '',
+      GOOGLE_CLIENT_SECRET: '',
+      S3_ACCESS_KEY_ID: '',
+      S3_SECRET_ACCESS_KEY: '',
+      SENTRY_DSN: '',
+    });
+    expect(env.GOOGLE_CLIENT_ID).toBeUndefined();
+    expect(env.S3_ACCESS_KEY_ID).toBeUndefined();
+    expect(env.SENTRY_DSN).toBeUndefined();
+    expect(() => loadEnv({ ...validEnv, GOOGLE_CLIENT_ID: 'id', GOOGLE_CLIENT_SECRET: '' })).toThrow(/GOOGLE_CLIENT_ID/);
   });
 });
 

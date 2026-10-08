@@ -17,7 +17,9 @@ const auth = createAuth({
   secret: env.BETTER_AUTH_SECRET,
   baseURL: env.BETTER_AUTH_URL,
   webOrigins: env.WEB_ORIGIN,
-  google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET },
+  google: env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+    ? { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET }
+    : undefined,
   email: createHttpEmailSender({ url: env.EMAIL_PROVIDER_URL, apiKey: env.EMAIL_PROVIDER_API_KEY, from: env.EMAIL_FROM }),
   logger,
   secureCookies: env.NODE_ENV === 'production' || env.BETTER_AUTH_URL.startsWith('https://'),

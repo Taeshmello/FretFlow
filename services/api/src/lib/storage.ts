@@ -26,15 +26,18 @@ export function createS3Storage(opts: {
   endpoint: string;
   region: string;
   bucket: string;
-  accessKeyId: string;
-  secretAccessKey: string;
+  /** Omit both on AWS to use the SDK default credential chain, such as an EC2 IAM role. */
+  accessKeyId?: string;
+  secretAccessKey?: string;
   forcePathStyle?: boolean;
 }): ObjectStorage {
   const client = new S3Client({
     endpoint: opts.endpoint,
     region: opts.region,
     forcePathStyle: opts.forcePathStyle ?? false,
-    credentials: { accessKeyId: opts.accessKeyId, secretAccessKey: opts.secretAccessKey },
+    credentials: opts.accessKeyId && opts.secretAccessKey
+      ? { accessKeyId: opts.accessKeyId, secretAccessKey: opts.secretAccessKey }
+      : undefined,
     // The SDK default would presign a CRC32 of the (empty) request body, which
     // real uploads then fail. We supply our own SHA-256 checksum instead.
     requestChecksumCalculation: 'WHEN_REQUIRED',
