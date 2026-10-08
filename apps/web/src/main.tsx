@@ -7,6 +7,12 @@ import './design.css';
 
 installErrorReporting();
 
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    void navigator.serviceWorker.register('/sw.js');
+  });
+}
+
 const root = document.getElementById('root');
 if (root) {
   createRoot(root).render(

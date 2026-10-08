@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "pnpm --filter @fretflow/web dev",
     "build": "pnpm --filter @fretflow/web build",
+    "icons:generate": "node scripts/generate-app-icons.mjs",
+    "assetlinks:generate": "node scripts/generate-assetlinks.mjs",
     "test": "vitest run",
     "typecheck": "pnpm -r --parallel typecheck",
     "lint": "node -e \"console.error('lint unavailable: typescript-eslint 8.71 supports TypeScript <6.1, this repo pins 7.0.2 (see docs/PROGRESS.md)'); process.exit(1)\""
