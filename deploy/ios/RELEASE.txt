@@ -1,0 +1,71 @@
+# iOS release plan
+
+FretFlow can use Capacitor for iOS because the product is already a React/Vite application with substantial app-like editing, playback, offline storage, and practice functionality. A production iOS build must bundle the web assets; Capacitor's remote `server.url` is a live-reload option and is not the production deployment plan.
+
+## Current blockers
+
+1. The installed Xcode is 15.4. Since 2026-04-28 App Store Connect only accepts builds made with Xcode 26 / the iOS 26 SDK or later. Install the current Xcode 26.x (check its minimum macOS first) before generating or uploading the production target.
+2. Browser authentication currently uses an HttpOnly `SameSite=Lax` cookie. A bundled Capacitor app runs under `capacitor://localhost` rather than `https://fretflow.iliasai.com`. Implement the bearer-token + Keychain design in `deploy/ios/AUTH-DESIGN.txt` and pass its server tests first. Do not weaken CSRF protection or enable unrestricted cross-origin cookies as a shortcut.
+3. Confirm the permanent bundle identifier. The suggested identifier, based on the owned domain, is `com.iliasai.fretflow`.
+4. Apple Developer Program and App Store Connect access are required for signing, TestFlight, and review submission.
+5. Account deletion: the API has no delete-account route. App Store guideline 5.1.1(v) requires in-app deletion for apps that allow sign-up (see AUTH-DESIGN.txt §4).
+
+## Prepared assets
+
+- Master opaque icon: `apps/web/public/icons/fretflow-1024.png`
+- Editable source: `apps/web/public/icons/fretflow-app-icon.svg`
+- iOS home-screen web icon: `apps/web/public/icons/fretflow-180.png`
+- Android/PWA icons: 192 px, 512 px, and a maskable 512 px variant
+- Reproducible generator: `pnpm icons:generate`
+
+The 1024 px image is the source for the Xcode AppIcon asset. Keep the artwork square and opaque; iOS applies the visible corner mask.
+
+## Capacitor setup after the blockers are resolved
+
+Capacitor 8.5.3 is the current release (checked 2026-10-08); pin exact versions. Run these from the repository:
+
+```bash
+pnpm --filter @fretflow/web add @capacitor/core@8.5.3 @capacitor/ios@8.5.3
+pnpm --filter @fretflow/web add -D @capacitor/cli@8.5.3
+pnpm --filter @fretflow/web build
+pnpm --filter @fretflow/web exec cap init FretFlow com.iliasai.fretflow --web-dir dist
+pnpm --filter @fretflow/web exec cap add ios --packagemanager SPM
+pnpm --filter @fretflow/web exec cap sync ios
+pnpm --filter @fretflow/web exec cap open ios
+```
+
+Do not run `cap init` until the bundle identifier is confirmed; changing identifiers after App Store Connect registration creates avoidable signing work.
+
+## Xcode and App Store Connect
+
+1. Select the Apple team and automatic signing in Xcode.
+2. Add the 1024 px icon to the AppIcon asset catalog.
+3. Set version `1.0.0` and increment the build number for every upload.
+4. Test on a physical iPhone: login (password and email code), universal links, score editing, IndexedDB persistence, audio playback, file import, S3 upload, offline launch, and safe-area/rotation behavior.
+5. Archive with a Release scheme and upload to App Store Connect.
+6. Distribute through TestFlight before requesting App Review.
+7. Complete privacy details, privacy-policy URL, age rating, screenshots, support URL, encryption declaration, and review notes with a working test account.
+
+Apple reviews whether an app offers more than a repackaged website. In review notes, describe the local-first tab editor, interactive playback, audio synchronization, offline score storage, and practice tools. Native integration such as document import/export, share sheet, secure session storage, and deep links also improves the iOS experience and review readiness.
+
+## Minimum native scope for v1 (review readiness)
+
+Guideline 4.2 asks for more than a repackaged website. Keep the native layer
+small and aimed at things WKWebView cannot do well. Everything else stays web.
+
+| Feature | Why | Implementation |
+| --- | --- | --- |
+| Secure session storage | Required by the auth design | In-repo `SecureSession` Keychain plugin (AUTH-DESIGN.txt §2) |
+| Export via share sheet | `<a download>` does not work in WKWebView, so .gp/.mid/.json/PDF export is broken without it | `@capacitor/filesystem` writes to the cache dir, `@capacitor/share` opens the share sheet (Save to Files, AirDrop, Mail) |
+| Document import + "Open in FretFlow" | Open .gp/.gp3-5/.gpx/.fretflow.json from Files, Mail, AirDrop | `<input type=file>` already works for the picker; add `CFBundleDocumentTypes` / exported UTI for `.fretflow.json` and imported UTIs for Guitar Pro, then route `appUrlOpen` file URLs into the existing importer |
+| Universal links for shares | Share links (`https://fretflow.iliasai.com/#/share/<token>`) open the app when installed | Associated Domains `applinks:fretflow.iliasai.com`; `/.well-known/apple-app-site-association` (served as JSON by the web container) matching path `/` with fragment `/share/*`; `@capacitor/app` `appUrlOpen` routes into the SPA. Also fix `share.ts`, which builds links from `location.origin` (would be `capacitor://localhost` on iOS): use the public origin on native |
+| Audio session | Playback must continue with the ringer switch on silent | Set `AVAudioSession` category `.playback` in `AppDelegate`; test with alphaTab synth |
+| Status bar / safe areas | Native feel on notch devices | `@capacitor/status-bar`, CSS `env(safe-area-inset-*)`; `viewport-fit=cover` |
+
+Explicitly out of scope for v1: push notifications, in-app purchase (if Pro is
+sold in the iOS app, digital unlocks must use IAP, so keep purchase flows out
+of the iOS build until that is decided), Sign in with Apple / Google (see
+AUTH-DESIGN.txt §3), widgets, iCloud sync.
+
+Review notes should mention the test account (email + password), the offline
+editor, share-sheet export and Files import.

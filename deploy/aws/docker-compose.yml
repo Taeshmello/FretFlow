@@ -1,0 +1,80 @@
+# Production stack for the EC2 host. Values come from deploy/aws/.env
+# (copy .env.example; see DEPLOYMENT.txt). Backend only: deploy.sh api
+name: fretflow
+
+# Rotate container logs so a long-running host cannot fill its disk.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  # Optional PostgreSQL on the same host (COMPOSE_PROFILES=db). With RDS,
+  # leave the profile off and point DATABASE_URL at RDS. No host port.
+  db:
+    profiles: ["db"]
+    image: postgres:17
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-fretflow}
+      POSTGRES_USER: ${POSTGRES_USER:-}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: fretflow-api:${FRETFLOW_IMAGE_TAG:-latest}
+    build:
+      context: ../..
+      dockerfile: services/api/Dockerfile
+    env_file:
+      - ${FRETFLOW_ENV_FILE:-.env}
+    depends_on:
+      db:
+        condition: service_healthy
+        required: false
+    ports:
+      - "127.0.0.1:${FRETFLOW_API_HOST_PORT:-3100}:3000"
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  web:
+    image: fretflow-web:${FRETFLOW_IMAGE_TAG:-latest}
+    build:
+      context: ../..
+      dockerfile: deploy/aws/Dockerfile.web
+      args:
+        VITE_API_URL: ${PUBLIC_ORIGIN:-https://fretflow.iliasai.com}
+        VITE_SOCIAL_LOGIN: ${VITE_SOCIAL_LOGIN:-}
+        VITE_POSTHOG_KEY: ${VITE_POSTHOG_KEY:-}
+        VITE_POSTHOG_HOST: ${VITE_POSTHOG_HOST:-}
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+    ports:
+      - "127.0.0.1:${FRETFLOW_WEB_HOST_PORT:-8082}:80"
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/index.html"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  pgdata:

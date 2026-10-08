@@ -1,0 +1,97 @@
+# Android release (Trusted Web Activity)
+
+FretFlow ships on Google Play as a Trusted Web Activity built with Bubblewrap.
+The Android app is a thin Chrome-backed shell around https://fretflow.iliasai.com;
+the web deployment is the product, so the AWS deployment must be live first.
+
+## 0. Decisions before the first upload (permanent)
+
+- Package name: `com.iliasai.fretflow` is the template value in
+  `deploy/android/twa-manifest.json`. Play never allows changing it after the
+  first upload. Keep it identical to the iOS bundle ID unless there is a reason not to.
+- Use Play App Signing (default for new apps). Google holds the app-signing key;
+  you keep only the upload key.
+
+## 1. Prerequisites (on the Mac)
+
+- Node 22 and `npm i -g @bubblewrap/cli@1.25.0`
+- Bubblewrap installs its own JDK 17 and Android SDK on first run (`bubblewrap doctor`).
+- Production site reachable over HTTPS, with `/manifest.webmanifest` and icons
+  returning 200 (verify: `curl -I https://fretflow.iliasai.com/manifest.webmanifest`).
+
+## 2. Generate the project
+
+Generated Android sources and keys stay out of git (`deploy/android/build/`,
+`*.keystore`, `*.jks` are ignored).
+
+```bash
+mkdir -p deploy/android/build && cd deploy/android/build
+cp ../twa-manifest.json .
+bubblewrap init --manifest https://fretflow.iliasai.com/manifest.webmanifest
+```
+
+When `init` asks, keep the values from the copied `twa-manifest.json`
+(package `com.iliasai.fretflow`, key alias `fretflow-upload`) and let it create
+`fretflow-upload.keystore`. Bubblewrap prompts for the keystore and key passwords
+interactively; store them in a password manager, never in the repo, shell
+history or chat. Back up the keystore file outside this folder. Losing the upload
+key is recoverable through Play support, but costs days.
+
+## 3. Build the AAB
+
+```bash
+cd deploy/android/build
+bubblewrap build
+```
+
+Outputs: `app-release-bundle.aab` (upload to Play) and `app-release-signed.apk`
+(for local device testing). For every later release, raise `appVersionCode`
+(and usually `appVersionName`) in `twa-manifest.json`, then run
+`bubblewrap update && bubblewrap build`.
+
+## 4. Digital Asset Links
+
+Without a valid `/.well-known/assetlinks.json` the app opens with a browser URL bar.
+
+1. Upload key fingerprint (for sideloaded APK tests):
+   `keytool -list -v -keystore fretflow-upload.keystore -alias fretflow-upload`
+   (copy the SHA256 line).
+2. App signing key fingerprint: Play Console > the app > Test and release >
+   Setup > App integrity > App signing key certificate > SHA-256.
+3. Generate and commit the file (fingerprints are public values):
+
+```bash
+ANDROID_PACKAGE_ID=com.iliasai.fretflow \
+ANDROID_CERT_SHA256="<play-app-signing-sha256>,<upload-key-sha256>" \
+pnpm assetlinks:generate
+```
+
+4. Redeploy the web container, then verify:
+   - `curl -i https://fretflow.iliasai.com/.well-known/assetlinks.json`
+     (200, `content-type: application/json`, no redirect)
+   - https://developers.google.com/digital-asset-links/tools/generator
+   - On a device: install the Play internal-testing build, open it, confirm no URL bar.
+
+Cloudflare: if a WAF / Bot Fight rule challenges `/.well-known/*`, Google's
+verifier fails. Exclude that path from challenges.
+
+## 5. Play Console checklist
+
+1. Create the app, accept Play App Signing, upload the AAB to Internal testing.
+2. Add the app-signing SHA-256 to assetlinks (step 4) before testers install.
+3. Store listing: short/full description, 512 px icon
+   (`apps/web/public/icons/fretflow-512.png`), 1024x500 feature graphic,
+   phone screenshots (at least 2; also 7"/10" tablet screenshots recommended).
+4. App content: privacy policy URL, data safety form (account email, scores,
+   uploaded audio stored on AWS), ads = none, target audience, content rating.
+5. New personal developer accounts must run a closed test (12+ testers for
+   14 days) before production access; an organisation account skips this.
+   Check the current requirement in Play Console when the account is created.
+6. Promote Internal -> Closed -> Production.
+
+## 6. Auth inside the TWA
+
+A TWA runs in the user's Chrome on the real origin, so the existing HttpOnly
+`SameSite=Lax` cookie session works unchanged. Test: email/password login,
+magic link (opens in Chrome or the app depending on the user's link handling),
+Google sign-in if enabled, refresh after app kill, logout.

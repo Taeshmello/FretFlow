@@ -45,3 +45,8 @@ HANDOFF_CLAUDE*.txt
 
 # Design draft (local reference only)
 /FretFlow 디자인 초안.pdf
+
+# Android TWA (Bubblewrap): signing keys and generated project stay local
+*.keystore
+*.jks
+deploy/android/build/

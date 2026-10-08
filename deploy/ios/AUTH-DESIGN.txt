@@ -1,0 +1,123 @@
+# Native (iOS Capacitor) authentication design
+
+Status: design only, nothing implemented. Implement and pass the test plan in
+section 6 before running `cap add ios`.
+
+## 1. Problem
+
+The web app authenticates with Better Auth's HttpOnly `SameSite=Lax` session
+cookie on `https://fretflow.iliasai.com`. A bundled Capacitor iOS app loads its
+pages from `capacitor://localhost`, so every API call is cross-site:
+
+- WKWebView (ITP) blocks or drops third-party cookies; the session would not
+  survive reliably, and `SameSite=None` would weaken CSRF protection for the web.
+- Magic links open in Safari/Mail, not in the app's WebView, so a cookie set by
+  the link lands in the wrong cookie jar.
+- Android does not have this problem: the TWA runs in Chrome on the real origin.
+
+Rejected shortcuts: `SameSite=None` cookies, Capacitor `server.url` pointing
+at production, disabling the CSRF/origin checks, storing tokens in
+`localStorage` or Capacitor Preferences.
+
+## 2. Chosen transport: bearer session token in the Keychain
+
+Better Auth's `bearer` plugin (present in better-auth 1.7.6) maps
+`Authorization: Bearer <token>` onto the existing session, and returns a
+`set-auth-token` response header whenever it sets the session cookie. The
+token is the same signed session token as the cookie, so sessions, expiry,
+revocation, rate limits and `registerSessionGuard` keep working unchanged.
+
+Server changes (small, additive; web cookie flow untouched):
+
+1. `createAuth`: add `bearer({ requireSignature: true })` so only the signed
+   form is accepted.
+2. New optional env `NATIVE_APP_ORIGINS` (production value
+   `capacitor://localhost`). Add it to Better Auth `trustedOrigins` and to the
+   Hono CORS origin list only; keep `WEB_ORIGIN` for cookies and CSRF.
+3. CORS: allow request header `Authorization`, expose `set-auth-token`.
+   Keep `credentials: true` for web origins; the native client sends
+   `credentials: 'omit'`, so no cookie is ever involved there.
+4. Add Better Auth `emailOTP` for the native sign-in path (section 3).
+5. Tests: bearer request reaches `/api/me`; unsigned token rejected;
+   `capacitor://localhost` allowed by CORS but not by `csrf()` for form
+   posts; revoked session token returns 401; web cookie tests unchanged.
+
+Client changes (`apps/web/src/app/persistence.ts`, `session.ts`, `share.ts`,
+`practiceRemote.ts` all funnel through `API_URL` + `fetch`):
+
+1. One `apiFetch()` wrapper. On native (`Capacitor.isNativePlatform()`):
+   `credentials: 'omit'`, adds `Authorization: Bearer` from secure storage,
+   and stores any `set-auth-token` response header (sessions are refreshed
+   by Better Auth's `updateAge`, so the token may rotate).
+2. `VITE_API_URL=https://fretflow.iliasai.com` at native build time.
+3. On 401: clear the stored token and show the sign-in screen (local scores
+   in IndexedDB stay; sync resumes after sign-in).
+
+Secure storage: a small in-repo Capacitor plugin (`SecureSession`, ~60 lines
+of Swift) over the Keychain with
+`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`, no iCloud sync, three
+calls: `get`, `set`, `clear`. Owning it avoids an unmaintained third-party
+dependency for the single most sensitive value in the app.
+
+## 3. Sign-in methods on iOS
+
+| Method | iOS v1 | How |
+| --- | --- | --- |
+| Email + password | Yes | `POST /api/auth/sign-in/email` from the WebView; read `set-auth-token`. |
+| Email code (OTP) | Yes, replaces magic link | `emailOTP` plugin: user types the 6-digit code in-app. No deep link, no cookie-jar mismatch, nothing to intercept. |
+| Magic link | No (web keeps it) | Lands in Safari's cookie jar. |
+| Google | Defer | Needs `ASWebAuthenticationSession` + Better Auth `oneTimeToken` hand-off, and App Store guideline 4.8 then also requires Sign in with Apple. Ship v1 without third-party login. |
+
+Later Google/Apple flow, for reference: the app opens
+`ASWebAuthenticationSession` (ephemeral) on
+`https://fretflow.iliasai.com/native/sign-in?state=<random>`; after the OAuth
+callback the page calls `GET /api/auth/one-time-token/generate` and
+redirects to `fretflow-auth://callback?ott=...&state=...`; the app checks
+`state` and exchanges the token at `POST /api/auth/one-time-token/verify`
+(3-minute, single-use, store hashed), reading `set-auth-token`.
+
+## 4. Sign-out and account deletion
+
+- Sign-out: `POST /api/auth/sign-out` with the bearer token (server revokes
+  the session), then clear the Keychain item and in-memory user.
+- Account deletion is mandatory for review on both stores when the app lets
+  users create accounts (App Store 5.1.1(v); Google Play account-deletion
+  policy also needs a web URL). The API has no delete-account route yet.
+  Add one (Better Auth `deleteUser` with fresh-session or OTP verification,
+  plus S3 objects and owned rows), an in-app entry in Account, and a public
+  deletion-request page on the website.
+
+## 5. Threats considered
+
+- Token theft from storage: Keychain, this-device-only, not in JS storage.
+  The token is held in JS memory only while the app runs.
+- XSS in the WebView would expose the in-memory token; same impact as XSS
+  on the web origin today. Keep a CSP follow-up for both.
+- Other apps claiming `capacitor://localhost`: they cannot read our Keychain
+  or WebView memory; CORS allowance alone grants nothing without a token.
+- Custom URL scheme hijack (future OAuth): mitigated by
+  `ASWebAuthenticationSession` (callback delivered only to the caller),
+  `state`, and the short single-use one-time token.
+
+## 6. Test plan
+
+Server (vitest, PGlite, before any iOS work):
+1. Bearer token from email sign-in authorises `GET /api/me`, score sync and
+   audio presign; cookie-less.
+2. Tampered / unsigned / expired / revoked token -> 401.
+3. CORS preflight from `capacitor://localhost` allows `Authorization` and
+   exposes `set-auth-token`; a random origin is refused.
+4. Web regression: existing cookie, CSRF and rate-limit tests unchanged.
+5. Email OTP: correct code signs in; wrong code x N is rate limited; code
+   expires; code is single-use.
+
+Device (physical iPhone, TestFlight build):
+1. Sign up, sign in with password, sign in with email code.
+2. Kill the app, relaunch: still signed in (Keychain), no network -> local
+   scores open, sync resumes when online.
+3. Reboot the phone, unlock, launch: still signed in.
+4. Sign out: token removed, `/api/me` with the old token returns 401.
+5. Revoke the session server-side: next request shows sign-in, local data kept.
+6. Score edit sync both ways with the web app; audio upload/download via S3.
+7. Delete account: data gone, cannot sign in, web shows the same.
+8. Airplane-mode launch, background/foreground during upload, low-storage.
