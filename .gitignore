@@ -18,6 +18,7 @@ test-results/
 *.log
 npm-debug.log*
 pnpm-debug.log*
+.backups/
 
 # 에디터 / OS
 .idea/

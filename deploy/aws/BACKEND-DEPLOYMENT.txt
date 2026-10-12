@@ -1,0 +1,142 @@
+# FretFlow backend-only deployment on shared EC2
+
+This procedure starts only the FretFlow API and, when `COMPOSE_PROFILES=db`,
+its dedicated PostgreSQL container. It does not build or start the frontend,
+does not run `docker compose down`, does not remove orphans, and never removes
+volumes. Nginx, TLS and public HTTPS are deliberately outside this phase.
+
+## Isolation from existing services
+
+- Compose project: `fretflow` (separate containers, network and volume).
+- API host binding: `127.0.0.1:3100` by default; it is not internet-facing.
+- PostgreSQL: Docker-network-only `db:5432`; there is no host port mapping.
+- Persistent data: named volume `fretflow_pgdata`.
+- Frontend: `frontend` profile, inactive during backend deployment.
+- Existing CareLog/company containers are never named or targeted.
+
+Do not use `docker compose down -v`, `docker volume rm`, `docker system prune`,
+or a Compose command with another project's name.
+
+## 1. Prepare the production environment
+
+Run as the `ubuntu` user from `~/fretflow`. Do not use the old repository-root
+`.env`; `deploy.sh` reads `deploy/aws/.env` explicitly.
+
+```bash
+cd ~/fretflow
+test -f deploy/aws/.env || cp deploy/aws/.env.example deploy/aws/.env
+chmod 600 deploy/aws/.env
+nano deploy/aws/.env
+```
+
+Keep these committed values unless the deployment design changes:
+
+```dotenv
+PUBLIC_ORIGIN=https://fretflow.iliasai.com
+BETTER_AUTH_URL=https://fretflow.iliasai.com
+WEB_ORIGIN=https://fretflow.iliasai.com
+NODE_ENV=production
+PORT=3000
+CLIENT_IP_HEADER=x-real-ip
+COMPOSE_PROFILES=db
+POSTGRES_DB=fretflow
+S3_REGION=auto
+S3_BUCKET=fretflow-audio
+S3_FORCE_PATH_STYLE=false
+S3_UPLOAD_CHECKSUM=none
+FRETFLOW_API_HOST_PORT=3100
+```
+
+Create or enter these values on EC2; never commit or paste them into tickets:
+
+- `POSTGRES_USER`: a FretFlow-only user, for example `fretflow`.
+- `POSTGRES_PASSWORD`: `openssl rand -hex 32`.
+- `DATABASE_URL`: `postgres://<user>:<password>@db:5432/fretflow`.
+- `BETTER_AUTH_SECRET`: `openssl rand -base64 48`; keep it stable.
+- `EMAIL_PROVIDER_API_KEY`: Resend-compatible email provider key.
+- `S3_ENDPOINT`: `https://<Cloudflare account id>.r2.cloudflarestorage.com`.
+- `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY`: bucket-scoped R2 token keys.
+
+`EMAIL_FROM` must use a sender/domain verified by the email provider. Google
+login is optional; set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` together,
+or leave both empty. `VITE_*` values are not needed for this backend phase.
+
+If using private RDS instead of the dedicated DB container, remove `db` from
+`COMPOSE_PROFILES`, use an RDS `DATABASE_URL` with `sslmode=require`, and ensure
+RDS backups/PITR are enabled. Do not point FretFlow at an existing service DB.
+
+## 2. Read-only preflight
+
+```bash
+cd ~/fretflow
+deploy/aws/deploy.sh check
+sudo ss -lntp | grep -E ':(3100|5432|8000|8081)\b' || true
+```
+
+The check validates required variables, rejects localhost DB/origin values,
+verifies the API port and confirms the frontend profile is inactive. It does
+not build images or change containers/data.
+
+## 3. Deploy only the backend
+
+```bash
+cd ~/fretflow
+deploy/aws/deploy.sh backend
+```
+
+The script performs these steps in order:
+
+1. Refuses tracked/untracked Git changes and host-port conflicts.
+2. Builds only `fretflow-api:<git-sha>`; it does not build the web image.
+3. If an existing FretFlow DB container or its persistent volume exists,
+   starts only that DB when necessary and writes a custom-format `pg_dump`
+   under `.backups/postgres/` before migrations.
+4. Starts/updates only `api` and its declared `db` dependency.
+5. The API container applies committed Drizzle migrations, then starts.
+6. Waits for the DB-backed health endpoint to return success.
+
+On the first deploy there is no existing DB to back up. PostgreSQL initializes
+the empty `fretflow_pgdata` volume, and Drizzle applies all migrations. Later
+deployments keep the same volume and create a backup before migration.
+
+## 4. Verify success
+
+```bash
+curl -fsS http://127.0.0.1:3100/api/health
+docker compose --env-file deploy/aws/.env \
+  -f deploy/aws/docker-compose.yml ps
+docker compose --env-file deploy/aws/.env \
+  -f deploy/aws/docker-compose.yml logs --tail=100 api
+```
+
+Expected health response: `{"status":"ok"}`. `db` and `api` should be healthy;
+there should be no FretFlow `web` container. PostgreSQL must show no published
+host port. Public HTTPS will remain unavailable until the separate Nginx/TLS
+phase is completed.
+
+## 5. Failure logs and application rollback
+
+```bash
+docker compose --env-file deploy/aws/.env \
+  -f deploy/aws/docker-compose.yml ps
+docker compose --env-file deploy/aws/.env \
+  -f deploy/aws/docker-compose.yml logs --tail=200 api db
+```
+
+If the previous API image exists locally, roll back only the API container:
+
+```bash
+FRETFLOW_IMAGE_TAG=<previous-git-sha> docker compose \
+  --env-file deploy/aws/.env -f deploy/aws/docker-compose.yml \
+  up -d --no-deps api
+```
+
+This does not stop or recreate PostgreSQL. Application rollback does not undo
+database migrations. The migrations currently committed to this repository are
+additive, but review that assumption again for every future release. Do not
+restore a database dump unless a migration damaged data and a separately
+reviewed restore plan explicitly requires it. List backups with:
+
+```bash
+ls -lh .backups/postgres/
+```

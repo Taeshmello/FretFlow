@@ -1,5 +1,8 @@
 # AWS deployment
 
+Current phase: backend-only. Complete `BACKEND-DEPLOYMENT.txt` first. The
+Nginx/TLS and web sections below describe the later public frontend phase.
+
 Production layout for `fretflow.iliasai.com`:
 
 - DNS is on Cloudflare and proxied (orange cloud). Cloudflare terminates the
@@ -15,8 +18,8 @@ Production layout for `fretflow.iliasai.com`:
 
 ## 1. EC2 prerequisites
 
-- Ubuntu 24.04 LTS (arm64 or x86_64), at least 2 GB RAM. The web image is built
-  on the host; with 2 GB add a 2 GB swap file before the first build.
+- Ubuntu 24.04 LTS (arm64 or x86_64), at least 2 GB RAM. Images are built on
+  the host; with 2 GB add a 2 GB swap file before the first build.
 - Elastic IP attached.
 - Security group: 443 from Cloudflare ranges (see `cloudflare-realip.conf`),
   22 only from the administrator IP or no SSH at all
@@ -30,8 +33,7 @@ sudo apt-get update
 sudo apt-get install -y ca-certificates curl git nginx
 # Docker Engine + Compose plugin from Docker's apt repository:
 # https://docs.docker.com/engine/install/ubuntu/
-sudo install -d -o "$USER" /opt/fretflow
-git clone https://github.com/Taeshmello/FretFlow.git /opt/fretflow
+git clone https://github.com/Taeshmello/FretFlow.git "$HOME/fretflow"
 sudo usermod -aG docker "$USER"   # then log out and back in
 ```
 
@@ -44,7 +46,7 @@ All runtime values live in `deploy/aws/.env` (ignored by Git). The template
 `deploy/aws/.env.example` lists names only, with Korean notes per value.
 
 ```bash
-cd /opt/fretflow/deploy/aws
+cd ~/fretflow/deploy/aws
 cp .env.example .env && chmod 600 .env && vi .env
 ```
 
@@ -137,7 +139,7 @@ Cloudflare rules to check: do not challenge `/api/*` or `/.well-known/*`
 ## 5. Host Nginx
 
 ```bash
-cd /opt/fretflow
+cd ~/fretflow
 sudo install -m 644 deploy/aws/cloudflare-realip.conf /etc/nginx/snippets/fretflow-cloudflare-realip.conf
 sudo install -m 644 deploy/aws/nginx-fretflow.conf /etc/nginx/sites-available/fretflow
 sudo ln -sf /etc/nginx/sites-available/fretflow /etc/nginx/sites-enabled/fretflow
@@ -148,38 +150,37 @@ Do not remove or edit existing `sites-enabled` entries. FretFlow adds only its
 own 443 virtual host; the existing app-frontend keeps host port 80.
 
 Keep Cloudflare ranges current monthly:
-`sudo /opt/fretflow/deploy/aws/update-cloudflare-ips.sh` (cron or systemd timer).
+`sudo /home/ubuntu/fretflow/deploy/aws/update-cloudflare-ips.sh` (cron or systemd timer).
 
-## 6. Deploy containers
+## 6. Deploy backend containers
 
 The repository's default `docker-compose.yml` now points to this production
 stack. Local-only PostgreSQL and S3Mock were moved to
 `docker-compose.local.yml`, so they cannot be started accidentally by a plain
 `docker compose up` on EC2. For container-published ports, the deployment
-script rejects 22, 80, 443, 5432, 8000 and 8081. The selected container host
-ports are 3100 (API) and 8082 (web), bound to loopback only; host Nginx owns
-the otherwise unused public TLS port 443.
+script rejects 22, 80, 443, 5432, 8000 and 8081 for the API binding. The
+selected API host port is 3100, bound to loopback only. The web service is
+behind an inactive `frontend` profile and is not built or started in this phase.
 
 ```bash
-cd /opt/fretflow
-deploy/aws/deploy.sh api    # backend first (and db when COMPOSE_PROFILES=db)
+cd ~/fretflow
+deploy/aws/deploy.sh check
+deploy/aws/deploy.sh backend
 curl -fsS http://127.0.0.1:3100/api/health
-deploy/aws/deploy.sh        # later: everything, including the web image
 ```
 
 Run it as the user that owns `.env` and is in the `docker` group. Images are
-tagged with the Git commit; to roll back, run
-`FRETFLOW_IMAGE_TAG=<previous> docker compose --env-file deploy/aws/.env -f deploy/aws/docker-compose.yml up -d --no-build`.
+tagged with the Git commit; see `BACKEND-DEPLOYMENT.txt` for the API-only
+rollback command.
 
-The script builds the requested images, starts them, waits for `/api/health` and the
-web container, and prints status. The web API address is embedded at build
-time from `PUBLIC_ORIGIN`. The API applies committed Drizzle migrations before
-listening. It does not prune global Docker images or touch containers from
-another Compose project.
+The script builds only the API image, backs up an existing local FretFlow DB,
+starts the API and its declared DB dependency, applies committed Drizzle
+migrations, and waits for `/api/health`. It does not remove orphans, prune
+global Docker images, start the frontend, or touch another Compose project.
 
 For the same-host PostgreSQL profile, the official image creates the configured
 database and user automatically when the `pgdata` volume is empty. The first
-`deploy.sh api` then starts the DB and applies every committed Drizzle migration.
+`deploy.sh backend` then starts the DB and applies every committed Drizzle migration.
 To run migrations manually after checking the DB backup, use:
 
 ```bash
@@ -189,32 +190,29 @@ docker compose --env-file deploy/aws/.env -f deploy/aws/docker-compose.yml \
   src/db/migrate.ts
 ```
 
-## 7. Verify
+## 7. Verify backend internally
 
 ```bash
-curl -fsS https://fretflow.iliasai.com/api/health
-curl -sI https://fretflow.iliasai.com/ | grep -i -E 'strict-transport|x-content-type'
-curl -sI https://fretflow.iliasai.com/manifest.webmanifest | grep -i content-type
+curl -fsS http://127.0.0.1:3100/api/health
+docker compose --env-file deploy/aws/.env -f deploy/aws/docker-compose.yml ps
 docker compose --env-file deploy/aws/.env -f deploy/aws/docker-compose.yml logs --tail=100 api
 ```
 
-In a browser: sign up, sign in, refresh (session kept), edit a score on two
-devices (sync), upload audio and play it back (R2), sign out. The API log
-should show real client IPs, not Cloudflare addresses.
+Public HTTPS verification waits for the later Nginx/TLS phase.
 
 ## 8. Update
 
 ```bash
-cd /opt/fretflow
+cd ~/fretflow
 git fetch && git checkout <reviewed-commit-or-tag>
-deploy/aws/deploy.sh
+deploy/aws/deploy.sh backend
 ```
 
 Restart the current containers without rebuilding:
 
 ```bash
 docker compose --env-file deploy/aws/.env -f deploy/aws/docker-compose.yml \
-  restart api web
+  restart api
 ```
 
 After changing `.env`, use `deploy/aws/deploy.sh` instead of `restart` so
