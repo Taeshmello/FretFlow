@@ -29,7 +29,9 @@ fi
 env_value() { grep -E "^$1=" "$ENV_FILE" | tail -n 1 | cut -d= -f2- || true; }
 
 missing=()
-for key in DATABASE_URL BETTER_AUTH_SECRET EMAIL_PROVIDER_API_KEY S3_BUCKET; do
+for key in DATABASE_URL BETTER_AUTH_SECRET EMAIL_PROVIDER_API_KEY \
+  S3_ENDPOINT S3_REGION S3_BUCKET S3_UPLOAD_CHECKSUM \
+  S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY; do
   [[ -n "$(env_value "$key")" ]] || missing+=("$key")
 done
 if [[ "$(env_value COMPOSE_PROFILES)" == *db* ]]; then
@@ -41,6 +43,49 @@ if (( ${#missing[@]} > 0 )); then
   echo "Refusing to deploy: empty values in $ENV_FILE: ${missing[*]}" >&2
   exit 1
 fi
+if [[ "$(env_value S3_ENDPOINT)" == *YOUR_CLOUDFLARE_ACCOUNT_ID* ]]; then
+  echo "Refusing to deploy: replace YOUR_CLOUDFLARE_ACCOUNT_ID in S3_ENDPOINT." >&2
+  exit 1
+fi
+if [[ "$(env_value S3_UPLOAD_CHECKSUM)" != none ]]; then
+  echo "Refusing to deploy: Cloudflare R2 requires S3_UPLOAD_CHECKSUM=none." >&2
+  exit 1
+fi
+
+# Only loopback ports that are free on the shared EC2 host may be used. The
+# container ports (3000, 80 and 5432) live inside Docker networks and do not
+# conflict with host services.
+api_port="$(env_value FRETFLOW_API_HOST_PORT)"
+web_port="$(env_value FRETFLOW_WEB_HOST_PORT)"
+api_port="${api_port:-3100}"
+web_port="${web_port:-8082}"
+reserved_ports=(22 80 443 5432 8000 8081)
+
+validate_port() {
+  local label="$1" port="$2" reserved
+  if [[ ! "$port" =~ ^[0-9]+$ ]] || (( port < 1024 || port > 65535 )); then
+    echo "Refusing to deploy: $label must be an integer from 1024 to 65535 (got '$port')." >&2
+    exit 1
+  fi
+  for reserved in "${reserved_ports[@]}"; do
+    if (( port == reserved )); then
+      echo "Refusing to deploy: $label=$port conflicts with a reserved host port." >&2
+      exit 1
+    fi
+  done
+}
+
+validate_port FRETFLOW_API_HOST_PORT "$api_port"
+validate_port FRETFLOW_WEB_HOST_PORT "$web_port"
+if (( api_port == web_port )); then
+  echo "Refusing to deploy: API and web host ports must be different." >&2
+  exit 1
+fi
+# Make the validated values authoritative even if the caller exported an
+# environment variable that would otherwise override the env file in Compose.
+export FRETFLOW_API_HOST_PORT="$api_port"
+export FRETFLOW_WEB_HOST_PORT="$web_port"
+
 if ! docker compose version >/dev/null 2>&1; then
   echo "Docker with the Compose plugin is required." >&2
   exit 1
@@ -74,13 +119,10 @@ wait_for() {
 
 wants() { [[ ${#SERVICES[@]} -eq 0 ]] || [[ " ${SERVICES[*]} " == *" $1 "* ]]; }
 
-api_port="$(env_value FRETFLOW_API_HOST_PORT)"
-web_port="$(env_value FRETFLOW_WEB_HOST_PORT)"
-wants api && wait_for api "http://127.0.0.1:${api_port:-3100}/api/health"
-wants web && wait_for web "http://127.0.0.1:${web_port:-8082}/index.html"
+wants api && wait_for api "http://127.0.0.1:${api_port}/api/health"
+wants web && wait_for web "http://127.0.0.1:${web_port}/index.html"
 
 "${COMPOSE[@]}" ps
-docker image prune -f >/dev/null
 
 echo "Done. Verify from outside: https://fretflow.iliasai.com/api/health"
 echo "Rollback: FRETFLOW_IMAGE_TAG=<previous tag> docker compose --env-file $ENV_FILE -f $SCRIPT_DIR/docker-compose.yml up -d --no-build"

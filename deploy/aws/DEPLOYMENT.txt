@@ -4,25 +4,26 @@ Production layout for `fretflow.iliasai.com`:
 
 - DNS is on Cloudflare and proxied (orange cloud). Cloudflare terminates the
   public TLS connection and connects to the origin over HTTPS ("Full (strict)");
-- host Nginx on EC2 terminates the origin TLS on 443 and redirects 80 -> 443;
+- host Nginx on EC2 terminates the origin TLS on 443; Cloudflare redirects
+  visitor HTTP requests to HTTPS, so FretFlow does not bind the occupied host port 80;
 - `/api/*` proxies to the API container on `127.0.0.1:3100` (`FRETFLOW_API_HOST_PORT`);
 - everything else proxies to the static web container on `127.0.0.1:8082` (`FRETFLOW_WEB_HOST_PORT`);
 - PostgreSQL runs as the `db` container on the same host (`COMPOSE_PROFILES=db`,
   no host port) or as a private RDS instance;
-- user audio is stored in a private S3 bucket through presigned URLs, using the
-  EC2 instance IAM role (no static keys on the host).
+- user audio is stored in a private Cloudflare R2 bucket through presigned URLs;
+  the EC2 host receives a bucket-scoped R2 API token through its protected env file.
 
 ## 1. EC2 prerequisites
 
 - Ubuntu 24.04 LTS (arm64 or x86_64), at least 2 GB RAM. The web image is built
   on the host; with 2 GB add a 2 GB swap file before the first build.
 - Elastic IP attached.
-- Security group: 443 and 80 from the internet (or only Cloudflare ranges,
-  see `cloudflare-realip.conf`), 22 only from the administrator IP or no SSH at all
+- Security group: 443 from Cloudflare ranges (see `cloudflare-realip.conf`),
+  22 only from the administrator IP or no SSH at all
   when using SSM Session Manager. Never open 3100, 8082 or 5432. The host may already run other services on
   80 / 8000 / 5432 / 8081; FretFlow's ports are chosen not to collide.
 - IAM instance role with `AmazonSSMManagedInstanceCore` (optional, for
-  keyless shell access) and the S3 policy in §3.
+  keyless shell access).
 
 ```bash
 sudo apt-get update
@@ -49,10 +50,10 @@ cp .env.example .env && chmod 600 .env && vi .env
 
 Generate secrets on the host, never in chat or on a shared machine:
 `openssl rand -base64 48` for `BETTER_AUTH_SECRET`, `openssl rand -hex 32` for
-`POSTGRES_PASSWORD` (hex keeps `DATABASE_URL` valid). Leave both S3 access-key
-variables empty so the SDK uses the instance role. Empty optional values are
-treated as unset. `deploy.sh` refuses to run while `.env` is not mode 600 or a
-required value is empty.
+`POSTGRES_PASSWORD` (hex keeps `DATABASE_URL` valid). Create a bucket-scoped R2
+API token as described in §3 and put its Access Key ID and Secret Access Key in
+the S3-named variables. Empty optional values are treated as unset. `deploy.sh`
+refuses to run while `.env` is not mode 600 or a required value is empty.
 
 `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are optional as a pair. When enabled, register this redirect URI:
 
@@ -60,7 +61,7 @@ required value is empty.
 https://fretflow.iliasai.com/api/auth/callback/google
 ```
 
-## 3. RDS and S3
+## 3. PostgreSQL and Cloudflare R2
 
 Keep RDS private (no public access) and allow port 5432 only from the EC2
 security group. Use separate users: the migration user owns the schema; the
@@ -71,41 +72,40 @@ Note: migrations run inside the API container on start, so the container
 receives `MIGRATION_DATABASE_URL`. Move migrations to a one-off release job
 before scaling out or if the app process must not hold DDL credentials.
 
-Keep the S3 bucket private (Block Public Access on, SSE-S3 default
-encryption). Its CORS policy must allow browser uploads:
+Create a private `fretflow-audio` R2 bucket. In **R2 > Manage R2 API Tokens**,
+create an Object Read & Write token scoped only to that bucket, then copy its
+Access Key ID and Secret Access Key into `deploy/aws/.env`. Use these values:
+
+```dotenv
+S3_ENDPOINT=https://YOUR_CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com
+S3_REGION=auto
+S3_BUCKET=fretflow-audio
+S3_FORCE_PATH_STYLE=false
+S3_UPLOAD_CHECKSUM=none
+S3_ACCESS_KEY_ID=<R2_ACCESS_KEY_ID>
+S3_SECRET_ACCESS_KEY=<R2_SECRET_ACCESS_KEY>
+```
+
+The `S3_*` names are intentional: R2 exposes an S3-compatible API.
+`S3_UPLOAD_CHECKSUM=none` is required because R2 does not support SHA-256 as a
+full-object `PutObject` checksum. The API still signs the content type and
+length, then verifies the stored size before marking an upload complete. Do not
+make the bucket public. Its CORS policy must allow direct browser uploads:
 
 ```json
 [
   {
     "AllowedOrigins": ["https://fretflow.iliasai.com"],
     "AllowedMethods": ["GET", "PUT", "HEAD"],
-    "AllowedHeaders": ["content-type", "x-amz-checksum-sha256"],
+    "AllowedHeaders": ["content-type"],
     "ExposeHeaders": ["ETag"],
     "MaxAgeSeconds": 3600
   }
 ]
 ```
 
-Instance role policy (replace the bucket name if different):
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
-    "Resource": "arn:aws:s3:::fretflow-audio/*"
-  }]
-}
-```
-
-Containers reach the instance role through IMDSv2. With the default hop limit
-of 1, requests from a bridged Docker container fail. Set the hop limit to 2:
-
-```bash
-aws ec2 modify-instance-metadata-options --instance-id <id> \
-  --http-tokens required --http-put-response-hop-limit 2
-```
+Do not commit the R2 token or paste it into deployment logs. If it is exposed,
+revoke it in Cloudflare and create a replacement.
 
 ## 4. Cloudflare and origin certificate
 
@@ -122,13 +122,13 @@ sudoedit /etc/ssl/fretflow/origin.key   # private key
 sudo chmod 600 /etc/ssl/fretflow/origin.key
 ```
 
-3. DNS: `fretflow` A record -> the Elastic IP, Proxied.
+3. DNS: `fretflow` A record -> the Elastic IP, Proxied. Enable Cloudflare's
+   **Always Use HTTPS** so visitor HTTP requests are redirected at the edge.
 
-Alternative: Let's Encrypt. With Nginx stopped and the record temporarily
-"DNS only", run `sudo certbot certonly --standalone -d fretflow.iliasai.com`,
-then point `ssl_certificate*` at `/etc/letsencrypt/live/fretflow.iliasai.com/`
-and turn the proxy back on. Renewal then needs the webroot
-(`/var/www/certbot`, already routed on port 80).
+Alternative: Let's Encrypt with a DNS-01 challenge. Do not use the standalone
+or HTTP-01 challenge because host port 80 belongs to the existing app-frontend.
+Use a narrowly scoped Cloudflare API token with Certbot's Cloudflare DNS plugin,
+then point `ssl_certificate*` at `/etc/letsencrypt/live/fretflow.iliasai.com/`.
 
 Cloudflare rules to check: do not challenge `/api/*` or `/.well-known/*`
 (Bot Fight Mode / WAF), and leave caching at the default (the containers send
@@ -141,15 +141,24 @@ cd /opt/fretflow
 sudo install -m 644 deploy/aws/cloudflare-realip.conf /etc/nginx/snippets/fretflow-cloudflare-realip.conf
 sudo install -m 644 deploy/aws/nginx-fretflow.conf /etc/nginx/sites-available/fretflow
 sudo ln -sf /etc/nginx/sites-available/fretflow /etc/nginx/sites-enabled/fretflow
-sudo rm -f /etc/nginx/sites-enabled/default
-sudo install -d /var/www/certbot
 sudo nginx -t && sudo systemctl reload nginx
 ```
+
+Do not remove or edit existing `sites-enabled` entries. FretFlow adds only its
+own 443 virtual host; the existing app-frontend keeps host port 80.
 
 Keep Cloudflare ranges current monthly:
 `sudo /opt/fretflow/deploy/aws/update-cloudflare-ips.sh` (cron or systemd timer).
 
 ## 6. Deploy containers
+
+The repository's default `docker-compose.yml` now points to this production
+stack. Local-only PostgreSQL and S3Mock were moved to
+`docker-compose.local.yml`, so they cannot be started accidentally by a plain
+`docker compose up` on EC2. For container-published ports, the deployment
+script rejects 22, 80, 443, 5432, 8000 and 8081. The selected container host
+ports are 3100 (API) and 8082 (web), bound to loopback only; host Nginx owns
+the otherwise unused public TLS port 443.
 
 ```bash
 cd /opt/fretflow
@@ -165,7 +174,20 @@ tagged with the Git commit; to roll back, run
 The script builds the requested images, starts them, waits for `/api/health` and the
 web container, and prints status. The web API address is embedded at build
 time from `PUBLIC_ORIGIN`. The API applies committed Drizzle migrations before
-listening.
+listening. It does not prune global Docker images or touch containers from
+another Compose project.
+
+For the same-host PostgreSQL profile, the official image creates the configured
+database and user automatically when the `pgdata` volume is empty. The first
+`deploy.sh api` then starts the DB and applies every committed Drizzle migration.
+To run migrations manually after checking the DB backup, use:
+
+```bash
+docker compose --env-file deploy/aws/.env -f deploy/aws/docker-compose.yml \
+  run --rm api node --experimental-strip-types \
+  --disable-warning=ExperimentalWarning --import ./src/runtime/register.ts \
+  src/db/migrate.ts
+```
 
 ## 7. Verify
 
@@ -177,7 +199,7 @@ docker compose --env-file deploy/aws/.env -f deploy/aws/docker-compose.yml logs 
 ```
 
 In a browser: sign up, sign in, refresh (session kept), edit a score on two
-devices (sync), upload audio and play it back (S3), sign out. The API log
+devices (sync), upload audio and play it back (R2), sign out. The API log
 should show real client IPs, not Cloudflare addresses.
 
 ## 8. Update
@@ -187,6 +209,16 @@ cd /opt/fretflow
 git fetch && git checkout <reviewed-commit-or-tag>
 deploy/aws/deploy.sh
 ```
+
+Restart the current containers without rebuilding:
+
+```bash
+docker compose --env-file deploy/aws/.env -f deploy/aws/docker-compose.yml \
+  restart api web
+```
+
+After changing `.env`, use `deploy/aws/deploy.sh` instead of `restart` so
+Compose recreates containers with the new environment.
 
 ## Mobile release status
 

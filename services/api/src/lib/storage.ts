@@ -30,6 +30,8 @@ export function createS3Storage(opts: {
   accessKeyId?: string;
   secretAccessKey?: string;
   forcePathStyle?: boolean;
+  /** R2 PutObject does not support a SHA-256 full-object checksum. */
+  uploadChecksum?: 'sha256' | 'none';
 }): ObjectStorage {
   const client = new S3Client({
     endpoint: opts.endpoint,
@@ -47,21 +49,33 @@ export function createS3Storage(opts: {
   return {
     async presignUpload(key, { contentType, size, sha256 }) {
       const checksum = Buffer.from(sha256, 'hex').toString('base64');
+      const useSha256Checksum = opts.uploadChecksum !== 'none';
       const cmd = new PutObjectCommand({
         Bucket,
         Key: key,
         ContentType: contentType,
         ContentLength: size,
-        ChecksumSHA256: checksum,
+        ...(useSha256Checksum ? { ChecksumSHA256: checksum } : {}),
       });
-      // Keep the checksum a signed header (not a query param) so storage
-      // verifies the uploaded bytes against it and rejects anything else.
-      const url = await getSignedUrl(client, cmd, {
-        expiresIn: SIGNED_URL_TTL_SEC,
-        signableHeaders: new Set(['content-type']),
-        unhoistableHeaders: new Set(['x-amz-checksum-sha256']),
-      });
-      return { url, headers: { 'content-type': contentType, 'x-amz-checksum-sha256': checksum } };
+      // Providers that support it get a signed checksum header. R2 still gets
+      // signed content type/length, and the completion route verifies size.
+      const url = await getSignedUrl(client, cmd, useSha256Checksum
+        ? {
+            expiresIn: SIGNED_URL_TTL_SEC,
+            signableHeaders: new Set(['content-type']),
+            unhoistableHeaders: new Set(['x-amz-checksum-sha256']),
+          }
+        : {
+            expiresIn: SIGNED_URL_TTL_SEC,
+            signableHeaders: new Set(['content-type']),
+          });
+      return {
+        url,
+        headers: {
+          'content-type': contentType,
+          ...(useSha256Checksum ? { 'x-amz-checksum-sha256': checksum } : {}),
+        },
+      };
     },
     presignDownload(key, { contentType }) {
       const cmd = new GetObjectCommand({

@@ -31,6 +31,8 @@ const envSchema = z.object({
   S3_SECRET_ACCESS_KEY: optionalText,
   /** Force path-style bucket URLs (MinIO). R2 works with either. */
   S3_FORCE_PATH_STYLE: z.stringbool().default(false),
+  /** R2 does not support SHA-256 as a full-object PutObject checksum. */
+  S3_UPLOAD_CHECKSUM: z.enum(['sha256', 'none']).default('sha256'),
   SENTRY_DSN: optionalText,
   /** Per-user audio storage cap (default 2GB) and unfinished-upload cap. */
   AUDIO_QUOTA_BYTES: z.coerce.number().int().positive().default(2 * 1024 * 1024 * 1024),

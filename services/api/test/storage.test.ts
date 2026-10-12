@@ -30,6 +30,25 @@ describe('createS3Storage.presignUpload', () => {
     expect([...q.keys()].some(k => k.toLowerCase() === 'x-amz-sdk-checksum-algorithm')).toBe(false);
     expect(headers).toEqual({ 'content-type': 'audio/mpeg', 'x-amz-checksum-sha256': SHA_B64 });
   });
+
+  it('omits the unsupported full-object SHA-256 checksum for Cloudflare R2', async () => {
+    const r2 = createS3Storage({
+      endpoint: 'https://account.r2.cloudflarestorage.com',
+      region: 'auto',
+      bucket: 'audio',
+      accessKeyId: 'AKIDEXAMPLE',
+      secretAccessKey: 'secret-example',
+      uploadChecksum: 'none',
+    });
+    const { url, headers } = await r2.presignUpload('audio/u1/abc', {
+      contentType: 'audio/mpeg',
+      size: 1234,
+      sha256: SHA_HEX,
+    });
+    const signedHeaders = new URL(url).searchParams.get('X-Amz-SignedHeaders')?.split(';') ?? [];
+    expect(signedHeaders).not.toContain('x-amz-checksum-sha256');
+    expect(headers).toEqual({ 'content-type': 'audio/mpeg' });
+  });
 });
 
 describe('upload URL binding (L3)', () => {

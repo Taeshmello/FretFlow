@@ -32,6 +32,7 @@ const storage = createS3Storage({
   accessKeyId: env.S3_ACCESS_KEY_ID,
   secretAccessKey: env.S3_SECRET_ACCESS_KEY,
   forcePathStyle: env.S3_FORCE_PATH_STYLE,
+  uploadChecksum: env.S3_UPLOAD_CHECKSUM,
 });
 
 const app = createApp({

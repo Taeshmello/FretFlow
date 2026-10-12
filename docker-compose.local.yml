@@ -1,0 +1,34 @@
+# Local development only (BACKEND.md §8). Never deploy this stack.
+#   docker compose -f docker-compose.local.yml up -d
+name: fretflow-local
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: fretflow
+      POSTGRES_PASSWORD: fretflow
+      POSTGRES_DB: fretflow
+    ports:
+      # Override when 5432 is taken locally:
+      # POSTGRES_PORT=5433 docker compose -f docker-compose.local.yml up -d
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fretflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # S3 stand-in for local audio uploads (Adobe S3Mock, Apache-2.0).
+  # Production uses a private Cloudflare R2 bucket.
+  s3:
+    image: adobe/s3mock:latest
+    environment:
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: fretflow-audio
+    ports:
+      - "${S3_PORT:-9000}:9090"
+
+volumes:
+  pgdata:
