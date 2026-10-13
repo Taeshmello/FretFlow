@@ -8,6 +8,7 @@ const csv = z
 
 /** Docker Compose env files pass `KEY=` as an empty string; treat it as unset. */
 const optionalText = z.preprocess(v => (v === '' ? undefined : v), z.string().min(1).optional());
+const optionalUrl = z.preprocess(v => (v === '' ? undefined : v), z.url().optional());
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -23,9 +24,11 @@ const envSchema = z.object({
   EMAIL_PROVIDER_API_KEY: z.string().min(1),
   /** Resend-compatible JSON endpoint: POST { from, to, subject, text, html }. */
   EMAIL_PROVIDER_URL: z.url().default('https://api.resend.com/emails'),
-  S3_ENDPOINT: z.url(),
-  S3_REGION: z.string().min(1),
-  S3_BUCKET: z.string().min(1),
+  /** Cloud audio sync is opt-in; browser-local recordings work without it. */
+  AUDIO_STORAGE_ENABLED: z.stringbool().default(false),
+  S3_ENDPOINT: optionalUrl,
+  S3_REGION: optionalText,
+  S3_BUCKET: optionalText,
   /** Optional on AWS: when both are absent, the SDK's default credential chain is used (for example an EC2 IAM role). */
   S3_ACCESS_KEY_ID: optionalText,
   S3_SECRET_ACCESS_KEY: optionalText,
@@ -54,6 +57,13 @@ const envSchema = z.object({
   }
   if (Boolean(env.S3_ACCESS_KEY_ID) !== Boolean(env.S3_SECRET_ACCESS_KEY)) {
     ctx.addIssue({ code: 'custom', path: ['S3_ACCESS_KEY_ID'], message: 'S3 access key id and secret must be set together' });
+  }
+  if (env.AUDIO_STORAGE_ENABLED) {
+    for (const key of ['S3_ENDPOINT', 'S3_REGION', 'S3_BUCKET'] as const) {
+      if (!env[key]) {
+        ctx.addIssue({ code: 'custom', path: [key], message: 'required when AUDIO_STORAGE_ENABLED=true' });
+      }
+    }
   }
   if (env.NODE_ENV === 'production' && !env.CLIENT_IP_HEADER) {
     ctx.addIssue({ code: 'custom', path: ['CLIENT_IP_HEADER'], message: 'required in production' });

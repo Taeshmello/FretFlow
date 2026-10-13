@@ -40,10 +40,7 @@ PORT=3000
 CLIENT_IP_HEADER=x-real-ip
 COMPOSE_PROFILES=db
 POSTGRES_DB=fretflow
-S3_REGION=auto
-S3_BUCKET=fretflow-audio
-S3_FORCE_PATH_STYLE=false
-S3_UPLOAD_CHECKSUM=none
+AUDIO_STORAGE_ENABLED=false
 FRETFLOW_API_HOST_PORT=3100
 ```
 
@@ -54,8 +51,12 @@ Create or enter these values on EC2; never commit or paste them into tickets:
 - `DATABASE_URL`: `postgres://<user>:<password>@db:5432/fretflow`.
 - `BETTER_AUTH_SECRET`: `openssl rand -base64 48`; keep it stable.
 - `EMAIL_PROVIDER_API_KEY`: Resend-compatible email provider key.
-- `S3_ENDPOINT`: `https://<Cloudflare account id>.r2.cloudflarestorage.com`.
-- `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY`: bucket-scoped R2 token keys.
+
+Browser-local recordings do not require object storage. Keep
+`AUDIO_STORAGE_ENABLED=false`; the audio and sync-map API routes stay disabled,
+while score editing, synth playback, saving and browser-local recording still
+work. To enable cross-device recording sync later, set the flag to `true` and
+provide the documented `S3_*` R2 values.
 
 `EMAIL_FROM` must use a sender/domain verified by the email provider. Google
 login is optional; set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` together,

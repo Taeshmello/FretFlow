@@ -45,8 +45,7 @@ env_value() { grep -E "^$1=" "$ENV_FILE" | tail -n 1 | cut -d= -f2- || true; }
 
 required=(
   NODE_ENV PORT DATABASE_URL BETTER_AUTH_SECRET BETTER_AUTH_URL WEB_ORIGIN
-  CLIENT_IP_HEADER EMAIL_FROM EMAIL_PROVIDER_API_KEY S3_ENDPOINT S3_REGION
-  S3_BUCKET S3_UPLOAD_CHECKSUM S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY
+  CLIENT_IP_HEADER EMAIL_FROM EMAIL_PROVIDER_API_KEY AUDIO_STORAGE_ENABLED
 )
 missing=()
 for key in "${required[@]}"; do
@@ -54,8 +53,14 @@ for key in "${required[@]}"; do
 done
 
 profiles="$(env_value COMPOSE_PROFILES)"
+audio_enabled="$(env_value AUDIO_STORAGE_ENABLED)"
 if [[ ",$profiles," == *,db,* ]]; then
   for key in POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD; do
+    [[ -n "$(env_value "$key")" ]] || missing+=("$key")
+  done
+fi
+if [[ "$audio_enabled" == true ]]; then
+  for key in S3_ENDPOINT S3_REGION S3_BUCKET S3_UPLOAD_CHECKSUM S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY; do
     [[ -n "$(env_value "$key")" ]] || missing+=("$key")
   done
 fi
@@ -76,6 +81,10 @@ if [[ ",$profiles," == *,frontend,* ]]; then
   echo "Refusing to continue: deploy.sh is backend-only; remove frontend from COMPOSE_PROFILES." >&2
   exit 1
 fi
+if [[ "$audio_enabled" != true && "$audio_enabled" != false ]]; then
+  echo "Refusing to continue: AUDIO_STORAGE_ENABLED must be true or false." >&2
+  exit 1
+fi
 
 database_url="$(env_value DATABASE_URL)"
 if [[ "$database_url" == *"@localhost"* || "$database_url" == *"@127.0.0.1"* ]]; then
@@ -93,13 +102,15 @@ for key in BETTER_AUTH_URL WEB_ORIGIN; do
     exit 1
   fi
 done
-if [[ "$(env_value S3_ENDPOINT)" == *YOUR_CLOUDFLARE_ACCOUNT_ID* ]]; then
-  echo "Refusing to continue: replace YOUR_CLOUDFLARE_ACCOUNT_ID in S3_ENDPOINT." >&2
-  exit 1
-fi
-if [[ "$(env_value S3_UPLOAD_CHECKSUM)" != none ]]; then
-  echo "Refusing to continue: Cloudflare R2 requires S3_UPLOAD_CHECKSUM=none." >&2
-  exit 1
+if [[ "$audio_enabled" == true ]]; then
+  if [[ "$(env_value S3_ENDPOINT)" == *YOUR_CLOUDFLARE_ACCOUNT_ID* ]]; then
+    echo "Refusing to continue: replace YOUR_CLOUDFLARE_ACCOUNT_ID in S3_ENDPOINT." >&2
+    exit 1
+  fi
+  if [[ "$(env_value S3_UPLOAD_CHECKSUM)" != none ]]; then
+    echo "Refusing to continue: Cloudflare R2 requires S3_UPLOAD_CHECKSUM=none." >&2
+    exit 1
+  fi
 fi
 google_client_id="$(env_value GOOGLE_CLIENT_ID)"
 google_client_secret="$(env_value GOOGLE_CLIENT_SECRET)"

@@ -29,6 +29,15 @@ function requestUpload(cookie: string | undefined, body: unknown = upload) {
   return t.request('/api/audio/upload-url', { method: 'POST', cookie, body: json(body) });
 }
 
+describe('optional cloud audio storage', () => {
+  it('does not register audio or sync-map routes when storage is disabled', async () => {
+    const withoutStorage = buildTestApp(db, { audioStorageEnabled: false });
+    const cookie = await withoutStorage.signIn('local-recording@example.com');
+    expect((await withoutStorage.request('/api/audio/upload-url', { method: 'POST', cookie, body: json(upload) })).status).toBe(404);
+    expect((await withoutStorage.request(`/api/scores/${newId()}/sync-maps`, { cookie })).status).toBe(404);
+  });
+});
+
 /** Runs the whole upload flow and returns the asset id. */
 async function uploadReady(cookie: string, sha = SHA): Promise<string> {
   const res = await requestUpload(cookie, { ...upload, sha256: sha });

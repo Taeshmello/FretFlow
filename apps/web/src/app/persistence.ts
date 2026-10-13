@@ -11,6 +11,8 @@ import {
 
 /** Only the public API address lives in the client (BACKEND.md §3). Empty = local-only mode. */
 export const API_URL: string = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
+/** Local recordings remain available when cloud audio sync is disabled. */
+export const CLOUD_AUDIO_SYNC_ENABLED = import.meta.env.VITE_AUDIO_CLOUD_SYNC === 'true';
 
 export interface Persistence {
   scores: IndexedDbScoreStore;

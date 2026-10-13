@@ -32,7 +32,7 @@ function lockedRow(result: unknown): boolean {
  * completed within a day. A transaction advisory lock keeps two instances
  * from doing it at the same time.
  */
-export async function runMaintenance(deps: { db: Db; storage: ObjectStorage; logger: MaintenanceLogger; now?: () => number }): Promise<MaintenanceResult> {
+export async function runMaintenance(deps: { db: Db; storage?: ObjectStorage; logger: MaintenanceLogger; now?: () => number }): Promise<MaintenanceResult> {
   const now = deps.now ?? Date.now;
   return deps.db.transaction(async tx => {
     const lock = await tx.execute(sql`select pg_try_advisory_xact_lock(${LOCK_KEY}) as locked`);
@@ -40,7 +40,7 @@ export async function runMaintenance(deps: { db: Db; storage: ObjectStorage; log
       return { ran: false, trash: 0, stalePending: 0 };
     }
     const trash = await purgeTrash(tx);
-    const stalePending = await purgeStalePending(tx, deps.storage, new Date(now() - DAY_MS));
+    const stalePending = deps.storage ? await purgeStalePending(tx, deps.storage, new Date(now() - DAY_MS)) : 0;
     deps.logger.info({ trash, stalePending }, 'maintenance done');
     return { ran: true, trash, stalePending };
   });

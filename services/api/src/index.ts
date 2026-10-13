@@ -25,15 +25,17 @@ const auth = createAuth({
   secureCookies: env.NODE_ENV === 'production' || env.BETTER_AUTH_URL.startsWith('https://'),
 });
 
-const storage = createS3Storage({
-  endpoint: env.S3_ENDPOINT,
-  region: env.S3_REGION,
-  bucket: env.S3_BUCKET,
-  accessKeyId: env.S3_ACCESS_KEY_ID,
-  secretAccessKey: env.S3_SECRET_ACCESS_KEY,
-  forcePathStyle: env.S3_FORCE_PATH_STYLE,
-  uploadChecksum: env.S3_UPLOAD_CHECKSUM,
-});
+const storage = env.AUDIO_STORAGE_ENABLED
+  ? createS3Storage({
+      endpoint: env.S3_ENDPOINT!,
+      region: env.S3_REGION!,
+      bucket: env.S3_BUCKET!,
+      accessKeyId: env.S3_ACCESS_KEY_ID,
+      secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+      forcePathStyle: env.S3_FORCE_PATH_STYLE,
+      uploadChecksum: env.S3_UPLOAD_CHECKSUM,
+    })
+  : undefined;
 
 const app = createApp({
   db,
@@ -47,6 +49,8 @@ const app = createApp({
 
 // Daily cleanup (trash > 30 days, unfinished uploads > 1 day). Safe with several instances.
 const stopMaintenance = startMaintenance(() => runMaintenance({ db, storage, logger }), { logger });
+
+logger.info({ cloudAudio: Boolean(storage) }, 'optional features configured');
 
 const server = serve({ fetch: app.fetch, port: env.PORT }, info => {
   logger.info({ port: info.port }, 'api listening');

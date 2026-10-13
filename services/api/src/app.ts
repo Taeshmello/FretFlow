@@ -25,7 +25,8 @@ import { syncMapRoutes } from './routes/sync-maps.ts';
 export interface AppDeps {
   db: Db;
   auth: Auth;
-  storage: ObjectStorage;
+  /** Omit to keep browser-local recordings but disable cloud audio routes. */
+  storage?: ObjectStorage;
   logger: Logger;
   /** CORS / CSRF allow list (WEB_ORIGIN). */
   webOrigins: string[];
@@ -89,8 +90,10 @@ export function createApp(deps: AppDeps) {
   app.route('/api/scores', scoreRoutes(db));
   app.route('/api/scores', ownerShareRoutes(db));
   app.route('/api/scores', practiceRoutes(db));
-  app.route('/api/scores', syncMapRoutes(db));
-  app.route('/api/audio', audioRoutes(db, deps.storage, limits.audioUpload, audioLimits));
+  if (deps.storage) {
+    app.route('/api/scores', syncMapRoutes(db));
+    app.route('/api/audio', audioRoutes(db, deps.storage, limits.audioUpload, audioLimits));
+  }
 
   return app;
 }

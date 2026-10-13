@@ -59,7 +59,10 @@ export function createFakeStorage(): ObjectStorage & {
   };
 }
 
-export function buildTestApp(db: Db, opts: { rateLimits?: Partial<RateLimits>; audioLimits?: Partial<AudioLimits> } = {}) {
+export function buildTestApp(
+  db: Db,
+  opts: { rateLimits?: Partial<RateLimits>; audioLimits?: Partial<AudioLimits>; audioStorageEnabled?: boolean } = {},
+) {
   const email = createMemoryEmailSender();
   const storage = createFakeStorage();
   const logger = silentLogger();
@@ -76,7 +79,7 @@ export function buildTestApp(db: Db, opts: { rateLimits?: Partial<RateLimits>; a
     db,
     auth,
     logger,
-    storage,
+    storage: opts.audioStorageEnabled === false ? undefined : storage,
     webOrigins: [WEB_ORIGIN],
     clientIpHeader: 'x-test-ip',
     rateLimits: { perUser: unlimited, signIn: unlimited, signInEmail: unlimited, signUp: unlimited, passwordEmail: unlimited, audioUpload: unlimited, ...opts.rateLimits },

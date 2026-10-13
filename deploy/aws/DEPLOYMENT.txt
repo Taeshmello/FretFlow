@@ -13,8 +13,8 @@ Production layout for `fretflow.iliasai.com`:
 - everything else proxies to the static web container on `127.0.0.1:8082` (`FRETFLOW_WEB_HOST_PORT`);
 - PostgreSQL runs as the `db` container on the same host (`COMPOSE_PROFILES=db`,
   no host port) or as a private RDS instance;
-- user audio is stored in a private Cloudflare R2 bucket through presigned URLs;
-  the EC2 host receives a bucket-scoped R2 API token through its protected env file.
+- browser-local recordings need no server storage. Optional cross-device audio
+  sync uses a private Cloudflare R2 bucket through presigned URLs.
 
 ## 1. EC2 prerequisites
 
@@ -52,9 +52,10 @@ cp .env.example .env && chmod 600 .env && vi .env
 
 Generate secrets on the host, never in chat or on a shared machine:
 `openssl rand -base64 48` for `BETTER_AUTH_SECRET`, `openssl rand -hex 32` for
-`POSTGRES_PASSWORD` (hex keeps `DATABASE_URL` valid). Create a bucket-scoped R2
-API token as described in §3 and put its Access Key ID and Secret Access Key in
-the S3-named variables. Empty optional values are treated as unset. `deploy.sh`
+`POSTGRES_PASSWORD` (hex keeps `DATABASE_URL` valid). Keep
+`AUDIO_STORAGE_ENABLED=false` when cross-device audio sync is not required. If
+it is enabled, create a bucket-scoped R2 API token as described in §3 and put
+its keys in the S3-named variables. Empty optional values are treated as unset. `deploy.sh`
 refuses to run while `.env` is not mode 600 or a required value is empty.
 
 `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are optional as a pair. When enabled, register this redirect URI:
@@ -74,11 +75,16 @@ Note: migrations run inside the API container on start, so the container
 receives `MIGRATION_DATABASE_URL`. Move migrations to a one-off release job
 before scaling out or if the app process must not hold DDL credentials.
 
-Create a private `fretflow-audio` R2 bucket. In **R2 > Manage R2 API Tokens**,
+This section is optional. With `AUDIO_STORAGE_ENABLED=false`, leave the S3
+credentials empty. Recordings remain in each browser and audio API routes are
+not registered.
+
+For cross-device audio sync, create a private `fretflow-audio` R2 bucket. In **R2 > Manage R2 API Tokens**,
 create an Object Read & Write token scoped only to that bucket, then copy its
 Access Key ID and Secret Access Key into `deploy/aws/.env`. Use these values:
 
 ```dotenv
+AUDIO_STORAGE_ENABLED=true
 S3_ENDPOINT=https://YOUR_CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com
 S3_REGION=auto
 S3_BUCKET=fretflow-audio
@@ -87,6 +93,9 @@ S3_UPLOAD_CHECKSUM=none
 S3_ACCESS_KEY_ID=<R2_ACCESS_KEY_ID>
 S3_SECRET_ACCESS_KEY=<R2_SECRET_ACCESS_KEY>
 ```
+
+Build the frontend with `VITE_AUDIO_CLOUD_SYNC=true` at the same time. Leaving
+that value false keeps recordings local even when the backend storage exists.
 
 The `S3_*` names are intentional: R2 exposes an S3-compatible API.
 `S3_UPLOAD_CHECKSUM=none` is required because R2 does not support SHA-256 as a

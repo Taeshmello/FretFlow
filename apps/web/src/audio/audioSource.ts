@@ -1,13 +1,13 @@
 import { AudioLoadError } from '@fretflow/audio-engine';
 import { sha256Hex } from '@fretflow/storage';
 import type { SyncMap } from '@fretflow/audio-engine';
-import type { persistence } from '../app/persistence';
+import { CLOUD_AUDIO_SYNC_ENABLED, type persistence } from '../app/persistence';
 
 type Persist = Awaited<ReturnType<typeof persistence>>;
 
 /** Another device saved audio + beat map for this score: download once and keep it locally. */
 export async function pullFromCloud(p: Persist, scoreId: string) {
-  const remote = p.remote;
+  const remote = CLOUD_AUDIO_SYNC_ENABLED ? p.remote : null;
   const [map] = remote ? await remote.syncMaps(scoreId) : [];
   if (!remote || !map) {
     return undefined;
@@ -39,7 +39,7 @@ export async function saveLocalAudio(p: Persist, scoreId: string, file: File): P
 
 /** Cloud copy only when signed in; the audio goes up once (sha256 dedupe on the server). */
 export async function pushToCloud(p: Persist, scoreId: string, audioId: string, map: SyncMap, durationSeconds: number): Promise<void> {
-  if (!p.remote) {
+  if (!CLOUD_AUDIO_SYNC_ENABLED || !p.remote) {
     return;
   }
   try {

@@ -16,6 +16,7 @@ const validEnv = {
   GOOGLE_CLIENT_SECRET: 'google-secret-value',
   EMAIL_FROM: 'FretFlow <login@example.com>',
   EMAIL_PROVIDER_API_KEY: 'key',
+  AUDIO_STORAGE_ENABLED: 'true',
   S3_ENDPOINT: 'https://r2.example.com',
   S3_REGION: 'auto',
   S3_BUCKET: 'audio',
@@ -52,6 +53,20 @@ describe('loadEnv', () => {
     expect(env.S3_ACCESS_KEY_ID).toBeUndefined();
     expect(() => loadEnv({ ...withoutProviderCredentials, GOOGLE_CLIENT_ID: 'id' })).toThrow(/GOOGLE_CLIENT_ID/);
     expect(() => loadEnv({ ...withoutProviderCredentials, S3_ACCESS_KEY_ID: 'ak' })).toThrow(/S3_ACCESS_KEY_ID/);
+  });
+
+  it('allows cloud audio storage and every S3 value to be omitted when disabled', () => {
+    const withoutAudioStorage = Object.fromEntries(
+      Object.entries(validEnv).filter(([key]) => !key.startsWith('S3_')),
+    );
+    const env = loadEnv({ ...withoutAudioStorage, AUDIO_STORAGE_ENABLED: 'false' });
+    expect(env.AUDIO_STORAGE_ENABLED).toBe(false);
+    expect(env.S3_ENDPOINT).toBeUndefined();
+  });
+
+  it('requires S3 connection values when cloud audio storage is enabled', () => {
+    const { S3_ENDPOINT: _endpoint, S3_REGION: _region, S3_BUCKET: _bucket, ...missingStorage } = validEnv;
+    expect(() => loadEnv(missingStorage)).toThrow(/S3_ENDPOINT/);
   });
 
   it('treats empty optional values from a Compose env file as unset', () => {

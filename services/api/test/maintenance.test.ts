@@ -45,6 +45,16 @@ describe('runMaintenance', () => {
   it('reports nothing to do on a clean database', async () => {
     expect(await runMaintenance({ db, storage: createFakeStorage(), logger: silent })).toEqual({ ran: true, trash: 0, stalePending: 0 });
   });
+
+  it('still purges score trash when cloud audio storage is disabled', async () => {
+    const t = buildTestApp(db, { audioStorageEnabled: false });
+    const ana = await t.signIn('no-audio@example.com');
+    const old = sampleScore({ title: 'Old without audio' });
+    await t.request('/api/scores', { method: 'POST', cookie: ana, body: json({ snapshot: old }) });
+    await db.update(scoresTable).set({ deletedAt: new Date(Date.now() - 31 * DAY) }).where(eq(scoresTable.id, old.id));
+
+    expect(await runMaintenance({ db, logger: silent })).toEqual({ ran: true, trash: 1, stalePending: 0 });
+  });
 });
 
 describe('startMaintenance', () => {
