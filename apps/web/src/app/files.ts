@@ -30,6 +30,29 @@ export interface PrintOptions {
 }
 
 /**
+ * Gives every print popup its own SMuFL font registration.
+ *
+ * alphaTab caches registered web fonts globally, but a cached FontFace from the
+ * editor document is not loaded in the new about:blank print document. Reusing
+ * that registration lets SVG rendering finish before Bravura is available, so
+ * print/PDF output can contain stems and beams with missing noteheads. Distinct
+ * URLs make alphaTab run its font readiness check inside the popup. The browser
+ * may still satisfy the requests from its HTTP cache.
+ */
+export function printSmuflFontSources(baseUrl: string, token: string): Map<alphaTab.FontFileFormat, string> {
+  const source = (file: string) => {
+    const url = new URL(file, baseUrl);
+    url.searchParams.set('fretflow-print', token);
+    return url.href;
+  };
+  return new Map([
+    [alphaTab.FontFileFormat.Woff2, source('Bravura.woff2')],
+    [alphaTab.FontFileFormat.Woff, source('Bravura.woff')],
+    [alphaTab.FontFileFormat.OpenType, source('Bravura.otf')],
+  ]);
+}
+
+/**
  * PDF export = alphaTab's print layout in a new window → the browser's
  * "Save as PDF" (SPEC §9). alphaTab renders that window asynchronously from the
  * same score object, so the free-tier footer (copyright line, hidden on screen)
@@ -45,7 +68,12 @@ export function printScore(api: alphaTab.AlphaTabApi, opts: PrintOptions): void 
   const pagePx = opts.paper === 'a4' ? 794 : 816;
   const [padX] = api.settings.display.padding.length ? api.settings.display.padding : [0];
   relayoutForWidth(score, pagePx - 2 * padX, opts.range ? opts.range[0] - 1 : 0, opts.range ? opts.range[1] - opts.range[0] + 1 : undefined);
+  const fontToken = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const fontBase = new URL('/font/', window.location.href).href;
   api.print(opts.paper === 'a4' ? '210mm' : '8.5in', {
+    core: {
+      smuflFontSources: printSmuflFontSources(fontBase, fontToken),
+    },
     display: {
       staveProfile: opts.staves === 'tab' ? alphaTab.StaveProfile.Tab : opts.staves === 'score' ? alphaTab.StaveProfile.Score : alphaTab.StaveProfile.ScoreTab,
       ...(opts.range ? { startBar: opts.range[0], barCount: opts.range[1] - opts.range[0] + 1 } : {}),
