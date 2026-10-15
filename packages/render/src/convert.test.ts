@@ -57,6 +57,29 @@ describe('string numbering (D-014)', () => {
 });
 
 describe('toAlphaTab', () => {
+  it('marks a same-bar tie destination for a parenthesized TAB number', () => {
+    const src = createScore({ bars: 1 });
+    const track = src.tracks[0];
+    const [origin, destination] = track.bars[0].beats;
+    origin.rest = false;
+    origin.notes = [createNote(track, 1, 8)];
+    destination.rest = false;
+    destination.notes = [{ ...createNote(track, 1, 8), tieFromPrev: true }];
+    const settings = new alphaTab.Settings();
+
+    const { score } = toAlphaTab(src, { staffMode: 'tab' }, settings);
+    const tied = score.tracks[0].staves[0].bars[0].voices[0].beats[1].notes[0];
+
+    expect(tied.isTieDestination).toBe(true);
+    expect(tied.tieOrigin?.fret).toBe(8);
+    expect(tied.bendType).toBe(alphaTab.model.BendType.Bend);
+    expect(tied.hasBend).toBe(false);
+    expect(settings.notation.isNotationElementVisible(alphaTab.NotationElement.TabNotesOnTiedBends)).toBe(true);
+    const back = fromAlphaTab(score).score.tracks[0].bars[0].beats[1].notes[0];
+    expect(back.tieFromPrev).toBe(true);
+    expect(back.effects.bend).toBeUndefined();
+  });
+
   it('renders a lyric and a standard-only guitar staff', () => {
     const src = createScore();
     src.tracks[0].bars[0].beats[0].lyric = 'Hello';

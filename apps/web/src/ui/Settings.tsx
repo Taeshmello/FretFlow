@@ -1,5 +1,7 @@
 import { cursorTrack, MAX_TRACKS, tempoAt, type Command, type EditorState } from '@fretflow/editor-core';
 import { pitchName, TUNING_PRESETS } from '@fretflow/score-model';
+import { useEffect, useState } from 'react';
+import { parseTimeSignature, TimeSignatureInput, type TimeSignatureDraft } from './TimeSignatureInput';
 
 interface Props {
   editor: EditorState;
@@ -7,9 +9,39 @@ interface Props {
 }
 
 const KEY_NAMES = ['C♭', 'G♭', 'D♭', 'A♭', 'E♭', 'B♭', 'F', 'C', 'G', 'D', 'A', 'E', 'B', 'F♯', 'C♯'];
-const TIME_SIGS = ['2/4', '3/4', '4/4', '5/4', '6/4', '7/4', '3/8', '6/8', '7/8', '9/8', '12/8'];
 /** Bar width relative to its natural width (MasterBar.width). */
 const WIDTHS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
+
+function BarTimeSignature({ barId, value, onChange }: { barId: string; value: [number, number]; onChange: (value: [number, number]) => void }) {
+  const [draft, setDraft] = useState<TimeSignatureDraft>([String(value[0]), String(value[1])]);
+  const parsed = parseTimeSignature(draft);
+
+  useEffect(() => {
+    setDraft([String(value[0]), String(value[1])]);
+  }, [barId, value[0], value[1]]);
+
+  function update(next: TimeSignatureDraft) {
+    setDraft(next);
+    const valid = parseTimeSignature(next);
+    if (valid && (valid[0] !== value[0] || valid[1] !== value[1])) {
+      onChange(valid);
+    }
+  }
+
+  function restoreInvalidDraft() {
+    if (!parsed) setDraft([String(value[0]), String(value[1])]);
+  }
+
+  return (
+    <div className="field time-signature-field" role="group" aria-label="Time signature" onBlur={event => {
+      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) restoreInvalidDraft();
+    }}>
+      <span>Time</span>
+      <TimeSignatureInput idPrefix={`bar-${barId}-time`} value={draft} invalid={!parsed} onChange={update} />
+      <small>Top 1–32 · bottom 1, 2, 4, 8, 16 or 32</small>
+    </div>
+  );
+}
 
 /** Time signature, key, tempo, section and repeats of the cursor bar, plus bar editing. */
 export function BarSettings({ editor, dispatch }: Props) {
@@ -21,14 +53,11 @@ export function BarSettings({ editor, dispatch }: Props) {
     <div className="settings">
       <h4>Bar {cursor.barIndex + 1}</h4>
       <div className="field-row">
-        <label className="field">
-          Time
-          <select value={mb.timeSig.join('/')} onChange={e => dispatch({ type: 'setMasterBar', prop: 'timeSig', value: e.target.value.split('/').map(Number) })}>
-            {TIME_SIGS.map(t => (
-              <option key={t}>{t}</option>
-            ))}
-          </select>
-        </label>
+        <BarTimeSignature
+          barId={mb.id}
+          value={mb.timeSig}
+          onChange={value => dispatch({ type: 'setMasterBar', prop: 'timeSig', value })}
+        />
         <label className="field">
           Key
           <select value={mb.keySig} onChange={e => dispatch({ type: 'setMasterBar', prop: 'keySig', value: Number(e.target.value) })}>

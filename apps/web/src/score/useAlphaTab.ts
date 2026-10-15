@@ -47,6 +47,8 @@ export function useAlphaTab(scrollElement: React.RefObject<HTMLElement | null>) 
           [alphaTab.NotationElement.ScoreWordsAndMusic, false],
           [alphaTab.NotationElement.GuitarTuning, false],
           [alphaTab.NotationElement.TrackNames, false],
+          // FretFlow shows every tied TAB destination as a parenthesized fret.
+          [alphaTab.NotationElement.TabNotesOnTiedBends, true],
           // Show "H"/"P" and "sl." so techniques are readable in the tab.
           [alphaTab.NotationElement.EffectHammerOnPullOffText, true],
           [alphaTab.NotationElement.EffectSlideText, true],

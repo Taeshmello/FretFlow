@@ -29,8 +29,9 @@ describe('bar fill', () => {
   const fourFour = { timeSig: [4, 4] as [number, number] };
   const q = { base: 4 as const, dots: 0 as const };
 
-  it('holds 3840 ticks in 4/4 and 2880 in 6/8', () => {
+  it('calculates capacity for 4/4, 2/2 and 6/8', () => {
     expect(barCapacity(fourFour)).toBe(3840);
+    expect(barCapacity({ timeSig: [2, 2] })).toBe(3840);
     expect(barCapacity({ timeSig: [6, 8] })).toBe(2880);
   });
 

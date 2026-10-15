@@ -85,6 +85,7 @@ export function printScore(api: alphaTab.AlphaTabApi, opts: PrintOptions): void 
         [alphaTab.NotationElement.ScoreArtist, true],
         [alphaTab.NotationElement.GuitarTuning, true],
         [alphaTab.NotationElement.EffectDynamics, false],
+        [alphaTab.NotationElement.TabNotesOnTiedBends, true],
       ]),
     },
   });

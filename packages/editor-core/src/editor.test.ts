@@ -302,6 +302,7 @@ describe('bars', () => {
   it('rejects an invalid time signature', () => {
     const s = fresh();
     expect(execute(s, { type: 'setMasterBar', prop: 'timeSig', value: [4, 3] }, 0).score).toBe(s.score);
+    expect(execute(s, { type: 'setMasterBar', prop: 'timeSig', value: [2, 2] }, 0).score.masterBars[0].timeSig).toEqual([2, 2]);
     expect(execute(s, { type: 'setMasterBar', prop: 'timeSig', value: [6, 8] }, 0).score.masterBars[0].timeSig).toEqual([6, 8]);
   });
 

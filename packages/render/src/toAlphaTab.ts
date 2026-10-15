@@ -275,6 +275,8 @@ function convertTrack(
 
 /** Builds a fresh alphaTab score. Cheap enough to do on every edit (D-004: 1–5ms for 200 bars). */
 export function toAlphaTab(score: Score, options: ConvertOptions, settings: alphaTab.Settings): Converted {
+  // Used with the marker above to show every tied destination number in TAB.
+  settings.notation.elements.set(alphaTab.NotationElement.TabNotesOnTiedBends, true);
   const out: Converted = { score: new at.Score(), beats: new Map(), refs: new Map(), modelLayout: false };
   const s = out.score;
   s.title = score.meta.title;
@@ -289,6 +291,25 @@ export function toAlphaTab(score: Score, options: ConvertOptions, settings: alph
     out.modelLayout = true;
   }
   s.finish(settings);
+  // alphaTab 1.8 only prints an ordinary tied TAB number at the start of a
+  // bar. Its tied-bend number path prints `(8)` at any beat. A bend type with
+  // no points is inert (`hasBend` remains false), so use it only as a drawing
+  // marker after finish() has completed the real tie relationships.
+  for (const track of s.tracks) {
+    for (const staff of track.staves) {
+      for (const bar of staff.bars) {
+        for (const voice of bar.voices) {
+          for (const beat of voice.beats) {
+            for (const note of beat.notes) {
+              if (note.isTieDestination && !note.hasBend && !note.tieOrigin?.hasBend) {
+                note.bendType = at.BendType.Bend;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
   // Bar.finish turns every Down in a bar that the pedal enters held into a Hold,
   // which would drop a re-pedal (Up then Down) from the drawing and the GP export.
   for (const [marker, type] of pedals) {

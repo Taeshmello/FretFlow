@@ -222,6 +222,30 @@ kbd {
   flex: 1 1 80px;
 }
 
+.field-row .time-signature-field {
+  flex-basis: 150px;
+}
+
+.time-signature-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+
+.time-signature-input input {
+  width: 100%;
+  min-width: 0;
+}
+
+.time-signature-field small {
+  line-height: 1.35;
+}
+
+.time-signature-input input[aria-invalid='true'] {
+  border-color: var(--danger, #c43d3d);
+}
+
 .check {
   display: flex;
   gap: 6px;
