@@ -1,7 +1,10 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { eq } from 'drizzle-orm';
+import { newId } from '@fretflow/score-model';
 import type { Db } from '../src/db/client.ts';
+import { schema } from '../src/db/client.ts';
 import { createMemoryRateLimiter } from '../src/lib/rate-limit.ts';
-import { buildTestApp, createTestDb, resetDb, WEB_ORIGIN } from './helpers.ts';
+import { buildTestApp, createTestDb, resetDb, sampleScore, WEB_ORIGIN } from './helpers.ts';
 
 let db: Db;
 beforeAll(async () => {
@@ -58,6 +61,69 @@ describe('GET /api/me', () => {
     const { request } = buildTestApp(db);
     const res = await request('/api/does-not-exist');
     expect(res.status).toBe(401);
+  });
+});
+
+describe('account deletion', () => {
+  it('deletes the account, sessions, scores and cloud audio object', async () => {
+    const t = buildTestApp(db);
+    const cookie = await t.signIn('delete-me@example.com');
+    const me = (await (await t.request('/api/me', { cookie })).json()) as { id: string };
+    const score = sampleScore();
+    const audioId = newId();
+    const storageKey = `audio/${me.id}/${'a'.repeat(64)}`;
+
+    await db.insert(schema.scores).values({
+      id: score.id,
+      ownerId: me.id,
+      title: score.meta.title,
+      composerType: score.meta.composerType,
+      snapshot: score,
+    });
+    await db.insert(schema.audioAssets).values({
+      id: audioId,
+      ownerId: me.id,
+      storageKey,
+      sha256: 'a'.repeat(64),
+      sizeBytes: 12,
+      status: 'ready',
+    });
+    t.storage.objects.set(storageKey, 12);
+
+    const deleted = await t.request('/api/auth/delete-user', {
+      method: 'POST',
+      cookie,
+      body: '{}',
+    });
+
+    expect(deleted.status).toBe(200);
+    expect(await deleted.json()).toEqual({ success: true, message: 'User deleted' });
+    expect(t.storage.deleted).toEqual([storageKey]);
+    expect(await db.select().from(schema.user).where(eq(schema.user.id, me.id))).toHaveLength(0);
+    expect(await db.select().from(schema.scores).where(eq(schema.scores.ownerId, me.id))).toHaveLength(0);
+    expect(await db.select().from(schema.audioAssets).where(eq(schema.audioAssets.ownerId, me.id))).toHaveLength(0);
+    expect((await t.request('/api/me', { cookie })).status).toBe(401);
+  });
+
+  it('keeps the account when deleting a cloud object fails', async () => {
+    const t = buildTestApp(db);
+    const cookie = await t.signIn('retry-delete@example.com');
+    const me = (await (await t.request('/api/me', { cookie })).json()) as { id: string };
+    const storageKey = `audio/${me.id}/${'b'.repeat(64)}`;
+    await db.insert(schema.audioAssets).values({
+      id: newId(),
+      ownerId: me.id,
+      storageKey,
+      sha256: 'b'.repeat(64),
+      sizeBytes: 12,
+      status: 'ready',
+    });
+    t.storage.deleteObject = async () => {
+      throw new Error('storage unavailable');
+    };
+
+    expect((await t.request('/api/auth/delete-user', { method: 'POST', cookie, body: '{}' })).status).toBe(500);
+    expect(await db.select().from(schema.user).where(eq(schema.user.id, me.id))).toHaveLength(1);
   });
 });
 

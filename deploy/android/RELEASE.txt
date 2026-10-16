@@ -14,10 +14,14 @@ the web deployment is the product, so the AWS deployment must be live first.
 
 ## 1. Prerequisites (on the Mac)
 
-- Node 22 and `npm i -g @bubblewrap/cli@1.25.0`
+- Node 22 and Bubblewrap 1.27.0. Prefer the pinned one-off command
+  `pnpm dlx @bubblewrap/cli@1.27.0 ...` so a global install cannot drift.
 - Bubblewrap installs its own JDK 17 and Android SDK on first run (`bubblewrap doctor`).
 - Production site reachable over HTTPS, with `/manifest.webmanifest` and icons
   returning 200 (verify: `curl -I https://fretflow.iliasai.com/manifest.webmanifest`).
+- As of 2026-10-16, new Play submissions must target API 36. Bubblewrap 1.27.0
+  generates `compileSdkVersion 36` and `targetSdkVersion 36`; verify the generated
+  `app/build.gradle` before every upload.
 
 ## 2. Generate the project
 
@@ -27,7 +31,8 @@ Generated Android sources and keys stay out of git (`deploy/android/build/`,
 ```bash
 mkdir -p deploy/android/build && cd deploy/android/build
 cp ../twa-manifest.json .
-bubblewrap init --manifest https://fretflow.iliasai.com/manifest.webmanifest
+pnpm dlx @bubblewrap/cli@1.27.0 doctor
+pnpm dlx @bubblewrap/cli@1.27.0 init --manifest https://fretflow.iliasai.com/manifest.webmanifest
 ```
 
 When `init` asks, keep the values from the copied `twa-manifest.json`
@@ -41,13 +46,13 @@ key is recoverable through Play support, but costs days.
 
 ```bash
 cd deploy/android/build
-bubblewrap build
+pnpm dlx @bubblewrap/cli@1.27.0 build
 ```
 
 Outputs: `app-release-bundle.aab` (upload to Play) and `app-release-signed.apk`
 (for local device testing). For every later release, raise `appVersionCode`
 (and usually `appVersionName`) in `twa-manifest.json`, then run
-`bubblewrap update && bubblewrap build`.
+`pnpm dlx @bubblewrap/cli@1.27.0 update && pnpm dlx @bubblewrap/cli@1.27.0 build`.
 
 ## 4. Digital Asset Links
 
@@ -79,15 +84,23 @@ verifier fails. Exclude that path from challenges.
 
 1. Create the app, accept Play App Signing, upload the AAB to Internal testing.
 2. Add the app-signing SHA-256 to assetlinks (step 4) before testers install.
-3. Store listing: short/full description, 512 px icon
-   (`apps/web/public/icons/fretflow-512.png`), 1024x500 feature graphic,
-   phone screenshots (at least 2; also 7"/10" tablet screenshots recommended).
+3. Store listing: use the copy in `deploy/android/PLAY-CONSOLE.txt`, the 512 px
+   icon (`apps/web/public/icons/fretflow-512.png`), the 1024x500 feature graphic
+   in `deploy/android/store-assets/`, and at least two real phone screenshots.
 4. App content: privacy policy URL, data safety form (account email, scores,
-   uploaded audio stored on AWS), ads = none, target audience, content rating.
+   uploaded audio only if that feature is enabled), ads = none, target audience,
+   content rating. Use these public URLs after the matching web release is live:
+   - `https://fretflow.iliasai.com/privacy/`
+   - `https://fretflow.iliasai.com/delete-account/`
+   - `https://fretflow.iliasai.com/terms/`
 5. New personal developer accounts must run a closed test (12+ testers for
    14 days) before production access; an organisation account skips this.
    Check the current requirement in Play Console when the account is created.
 6. Promote Internal -> Closed -> Production.
+
+The Play Console account owner must personally review and accept the Developer
+Program policies, Play App Signing terms, and US export-law declaration. These
+are legal attestations and are not automated by this repository.
 
 ## 6. Auth inside the TWA
 

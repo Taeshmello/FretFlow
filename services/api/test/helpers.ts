@@ -73,6 +73,7 @@ export function buildTestApp(
     webOrigins: [WEB_ORIGIN],
     email,
     logger,
+    storage: opts.audioStorageEnabled === false ? undefined : storage,
     secureCookies: false,
   });
   const app = createApp({

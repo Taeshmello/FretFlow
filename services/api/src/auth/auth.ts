@@ -1,10 +1,12 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { magicLink } from 'better-auth/plugins/magic-link';
+import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.ts';
 import { schema } from '../db/client.ts';
 import type { EmailSender } from '../lib/email.ts';
 import type { Logger } from '../lib/logger.ts';
+import type { ObjectStorage } from '../lib/storage.ts';
 
 export interface AuthConfig {
   db: Db;
@@ -14,6 +16,8 @@ export interface AuthConfig {
   google?: { clientId: string; clientSecret: string };
   email: EmailSender;
   logger: Logger;
+  /** Deletes cloud audio objects before the account's database rows cascade. */
+  storage?: ObjectStorage;
   /** Secure cookies. On everywhere except local http development and tests. */
   secureCookies: boolean;
 }
@@ -39,6 +43,23 @@ export function createAuth(config: AuthConfig) {
       minPasswordLength: 8,
       maxPasswordLength: 128,
       autoSignIn: true,
+    },
+    user: {
+      deleteUser: {
+        enabled: true,
+        async beforeDelete(user) {
+          if (!config.storage) return;
+          const assets = await config.db
+            .select({ storageKey: schema.audioAssets.storageKey })
+            .from(schema.audioAssets)
+            .where(eq(schema.audioAssets.ownerId, user.id));
+          // Object first: a storage failure prevents the database cascade and
+          // leaves the account intact so deletion can be retried safely.
+          for (const asset of assets) {
+            await config.storage.deleteObject(asset.storageKey);
+          }
+        },
+      },
     },
     plugins: [
       magicLink({

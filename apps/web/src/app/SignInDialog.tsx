@@ -69,9 +69,14 @@ export function SignInDialog({ onClose, onSignedIn }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [linkSent, setLinkSent] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (mode === 'signUp' && !acceptedTerms) {
+      setError('Accept the Terms of Use and Privacy Policy to create an account.');
+      return;
+    }
     setBusy(true);
     setError(null);
     const path = mode === 'signIn' ? '/api/auth/sign-in/email' : '/api/auth/sign-up/email';
@@ -147,6 +152,15 @@ export function SignInDialog({ onClose, onSignedIn }: Props) {
             onChange={e => setPassword(e.target.value)}
           />
         </label>
+        {mode === 'signUp' && (
+          <label className="check small">
+            <input type="checkbox" required checked={acceptedTerms} onChange={event => setAcceptedTerms(event.target.checked)} />
+            <span>
+              I agree to the <a href="/terms/" target="_blank" rel="noreferrer">Terms of Use</a> and{' '}
+              <a href="/privacy/" target="_blank" rel="noreferrer">Privacy Policy</a>.
+            </span>
+          </label>
+        )}
         {error && <p className="error-text" role="alert">{error}</p>}
         <button type="submit" className="btn primary" disabled={busy}>
           {busy ? 'Please wait…' : mode === 'signIn' ? 'Sign in' : 'Create account'}

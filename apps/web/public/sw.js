@@ -1,4 +1,4 @@
-const CACHE = 'fretflow-shell-v2';
+const CACHE = 'fretflow-shell-v3';
 const SHELL = [
   '/',
   '/manifest.webmanifest',
@@ -32,6 +32,9 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
   // Partial responses (206) cannot be stored, and /.well-known must stay live.
   if (request.headers.has('range') || url.pathname.startsWith('/.well-known/')) return;
+  // Public policy pages are standalone HTML. Let the browser fetch them rather
+  // than replacing the cached SPA shell with legal-page markup.
+  if (['/privacy/', '/terms/', '/delete-account/'].some(path => url.pathname.startsWith(path))) return;
 
   if (request.mode === 'navigate') {
     event.respondWith(
@@ -61,4 +64,3 @@ self.addEventListener('fetch', event => {
     }),
   );
 });
-

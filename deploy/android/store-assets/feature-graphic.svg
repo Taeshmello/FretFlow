@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
+  <rect width="1024" height="500" fill="#f2f3ef"/>
+  <circle cx="884" cy="-12" r="250" fill="#e9edff"/>
+  <circle cx="964" cy="448" r="178" fill="#f7d6c9"/>
+  <path d="M0 390 C180 330 310 455 500 392 C710 323 832 375 1024 324 L1024 500 L0 500Z" fill="#e8663d"/>
+
+  <g transform="translate(92 96)">
+    <rect width="220" height="220" rx="48" fill="#e8663d"/>
+    <rect x="46" y="46" width="128" height="128" rx="30" fill="#fdfcf8"/>
+    <g stroke="#e8663d" stroke-linecap="round">
+      <path d="M68 72H152M68 96H152M68 120H152M68 144H152" stroke-width="10"/>
+      <path d="M86 62V158M110 62V158M136 62V158" stroke-width="9"/>
+    </g>
+  </g>
+
+  <g fill="#1b1e1b" font-family="Inter, Arial, sans-serif">
+    <text x="354" y="176" font-size="80" font-weight="750" letter-spacing="-3">FretFlow</text>
+    <text x="358" y="231" font-size="30" font-weight="600" fill="#4b504a">Write. Play. Practice.</text>
+    <text x="358" y="276" font-size="21" fill="#686d67">Guitar tab and notation that move with you.</text>
+  </g>
+
+  <g transform="translate(362 316)" stroke="#1b1e1b" stroke-width="4" stroke-linecap="round" fill="none">
+    <path d="M0 0H450M0 24H450M0 48H450M0 72H450M0 96H450" opacity=".68"/>
+    <path d="M34 48V-8M112 72V8M196 24V-18M278 48V-2M370 24V-20"/>
+    <ellipse cx="34" cy="-8" rx="13" ry="9" fill="#1b1e1b" transform="rotate(-12 34 -8)"/>
+    <ellipse cx="112" cy="8" rx="13" ry="9" fill="#1b1e1b" transform="rotate(-12 112 8)"/>
+    <ellipse cx="196" cy="-18" rx="13" ry="9" fill="#1b1e1b" transform="rotate(-12 196 -18)"/>
+    <ellipse cx="278" cy="-2" rx="13" ry="9" fill="#1b1e1b" transform="rotate(-12 278 -2)"/>
+    <ellipse cx="370" cy="-20" rx="13" ry="9" fill="#1b1e1b" transform="rotate(-12 370 -20)"/>
+    <path d="M34 -8 C78 -46 148 -40 196 -18" stroke="#315de2" stroke-width="5"/>
+    <path d="M278 -2 C307 -52 349 -54 370 -20" stroke="#315de2" stroke-width="5"/>
+  </g>
+</svg>

@@ -12,19 +12,6 @@ const env = loadEnv();
 const logger = createLogger(env.LOG_LEVEL);
 const { db, close } = createPostgresDb(env.DATABASE_URL);
 
-const auth = createAuth({
-  db,
-  secret: env.BETTER_AUTH_SECRET,
-  baseURL: env.BETTER_AUTH_URL,
-  webOrigins: env.WEB_ORIGIN,
-  google: env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
-    ? { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET }
-    : undefined,
-  email: createHttpEmailSender({ url: env.EMAIL_PROVIDER_URL, apiKey: env.EMAIL_PROVIDER_API_KEY, from: env.EMAIL_FROM }),
-  logger,
-  secureCookies: env.NODE_ENV === 'production' || env.BETTER_AUTH_URL.startsWith('https://'),
-});
-
 const storage = env.AUDIO_STORAGE_ENABLED
   ? createS3Storage({
       endpoint: env.S3_ENDPOINT!,
@@ -36,6 +23,20 @@ const storage = env.AUDIO_STORAGE_ENABLED
       uploadChecksum: env.S3_UPLOAD_CHECKSUM,
     })
   : undefined;
+
+const auth = createAuth({
+  db,
+  secret: env.BETTER_AUTH_SECRET,
+  baseURL: env.BETTER_AUTH_URL,
+  webOrigins: env.WEB_ORIGIN,
+  google: env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+    ? { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET }
+    : undefined,
+  email: createHttpEmailSender({ url: env.EMAIL_PROVIDER_URL, apiKey: env.EMAIL_PROVIDER_API_KEY, from: env.EMAIL_FROM }),
+  logger,
+  storage,
+  secureCookies: env.NODE_ENV === 'production' || env.BETTER_AUTH_URL.startsWith('https://'),
+});
 
 const app = createApp({
   db,

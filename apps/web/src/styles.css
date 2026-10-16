@@ -80,6 +80,16 @@ select:focus-visible,
   background: transparent;
 }
 
+.btn.danger,
+.ghost.danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.btn.danger {
+  background: #fff4f3;
+}
+
 .small {
   font-size: 12px;
 }
@@ -415,6 +425,10 @@ kbd {
 }
 
 .account-menu p {
+  margin: 0;
+}
+
+.delete-account-modal p {
   margin: 0;
 }
 

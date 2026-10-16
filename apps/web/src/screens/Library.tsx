@@ -114,6 +114,9 @@ export function Library(p: Props) {
       )}
       <footer className="lib-foot muted small">
         Scores save automatically in this browser. Your recordings are never included in score files or shares.{' '}
+        <a className="link" href="/privacy/">Privacy</a>{' · '}
+        <a className="link" href="/terms/">Terms</a>{' · '}
+        <a className="link" href="/delete-account/">Account deletion</a>{' · '}
         <button type="button" className="link" onClick={() => setShowLicenses(true)}>
           Open-source licenses
         </button>

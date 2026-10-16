@@ -23,7 +23,14 @@ function Player({ score, onBack }: { score: Score; onBack: () => void }) {
     <header className="topbar"><button type="button" className="btn" onClick={onBack}>← My scores</button>
       <div className="title-block"><strong>{score.meta.title}</strong><span className="crumb">Shared read-only score</span></div></header>
     <div className="transport"><button type="button" className="play-btn" disabled={!ready} aria-label={playing ? 'Pause' : 'Play'} onClick={() => api?.playPause()}>{playing ? 'Ⅱ' : '▶'}</button>
-      <span className="muted small">{ready ? 'View and play only · recording not shared' : 'Loading sound…'}</span></div>
+      <span className="muted small">{ready ? 'View and play only · recording not shared' : 'Loading sound…'}</span>
+      <a
+        className="small"
+        href={`mailto:taeho0419@iliasai.com?subject=${encodeURIComponent('Report a shared FretFlow score')}&body=${encodeURIComponent(`Please review this shared score: ${window.location.href}\n\nReason:`)}`}
+      >
+        Report score
+      </a>
+    </div>
     {error && <p className="banner error">Score display error: {error}</p>}
     <main className="score-card card"><div className="score-scroll" ref={scrollRef}><div className="score-surface" ref={containerRef} /></div></main>
   </div>;

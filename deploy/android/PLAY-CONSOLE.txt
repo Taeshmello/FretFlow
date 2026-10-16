@@ -1,0 +1,145 @@
+# FretFlow — Play Console input sheet
+
+Prepared: 2026-10-16. Re-check Play Console wording and policies at submission time.
+
+## 1. App creation
+
+- App name: FretFlow
+- Package name: com.iliasai.fretflow
+- Default language: English (United States) — en-US (matches the current app UI)
+- App or game: App
+- Free or paid: Free
+- Category: Music & Audio
+- Contains ads: No
+- Target audience: 13 years and older (do not select a child-directed audience
+  unless the product and privacy review are redone for the Families policy)
+- Contact email: taeho0419@iliasai.com
+- Website: https://fretflow.iliasai.com/
+- Privacy policy: https://fretflow.iliasai.com/privacy/
+- Account deletion URL: https://fretflow.iliasai.com/delete-account/
+- Terms of Use: https://fretflow.iliasai.com/terms/
+
+The contact mailbox is `taeho0419@iliasai.com`. Confirm that the
+developer/company name shown in Play Console matches the operator named in the
+privacy policy. Replace both together if the legal entity is different.
+
+## 2. Main store listing draft (English)
+
+Short description (80 characters maximum):
+
+Write, play, and practice guitar tablature wherever inspiration strikes.
+
+Full description:
+
+FretFlow is a score editor, player, and practice workspace built for guitarists.
+
+- Enter tablature and see standard notation alongside it.
+- Create scores for guitar, bass, and other instruments.
+- Import and export Guitar Pro and FretFlow files.
+- Practice difficult passages with tempo, looping, and metronome controls.
+- Sign in to keep scores safely synchronized across devices.
+- Share a score with an unlisted, read-only link.
+- Print or save clean PDF scores.
+
+FretFlow is free to download and does not show ads. Payments are not currently
+available. Recordings stay on the user's device in the current release.
+
+## 3. Korean localization draft
+
+Short description (80 characters maximum):
+
+기타 타브 악보를 작성하고 재생하며 원하는 구간을 반복 연습하세요.
+
+Full description:
+
+FretFlow는 기타리스트를 위한 악보 작성·재생·연습 도구입니다.
+
+- 타브를 입력하면 오선 악보가 함께 표시됩니다.
+- 기타, 베이스 및 여러 악기의 악보를 작성할 수 있습니다.
+- Guitar Pro와 FretFlow 파일을 불러오고 내보낼 수 있습니다.
+- 템포, 반복 구간, 메트로놈을 사용해 어려운 부분을 연습할 수 있습니다.
+- 로그인하면 악보를 여러 기기에서 안전하게 동기화할 수 있습니다.
+- 읽기 전용 링크로 악보를 공유할 수 있습니다.
+- PDF로 인쇄하거나 저장할 수 있습니다.
+
+앱은 무료로 다운로드할 수 있으며 광고를 표시하지 않습니다. 결제 기능은
+현재 제공하지 않습니다. 녹음은 현재 사용자의 기기에만 저장됩니다.
+
+## 4. Required graphics
+
+- App icon: `apps/web/public/icons/fretflow-512.png`
+- Feature graphic: `deploy/android/store-assets/feature-graphic.jpg`
+- Phone screenshots: capture at least two from the real internal-test build.
+  Recommended scenes: score library, notation editor, playback/practice view.
+- Do not use mock UI or show real email addresses, private scores or access tokens.
+
+## 5. App content answers (draft — account owner must verify)
+
+- App access: Core editor works without an account. If review needs cloud sync,
+  provide a dedicated review account whose password is not reused anywhere else.
+- Ads: No.
+- News app: No.
+- Government app: No.
+- Health app: No.
+- Financial features: No.
+- Data collection: Yes.
+- Data encrypted in transit: Yes (HTTPS).
+- Users can request deletion: Yes, in-app Account > Delete account and the public
+  account-deletion URL above.
+- Data shared for advertising: No.
+
+Data types to declare while account/cloud sync is enabled:
+
+- Personal information > Email address: account management and authentication;
+  required for cloud accounts.
+- Personal information > Name: the account display name; account management.
+- User IDs: account management and security.
+- Files and docs / Other user-generated content: scores, score metadata, practice
+  sections and unlisted share settings; app functionality.
+- App activity, Device or other IDs, and Crash logs: declare only if PostHog or
+  Sentry is enabled in the exact production web build. Both are off when their
+  environment values are empty.
+- Audio files: do not declare as collected while `AUDIO_STORAGE_ENABLED=false`
+  and `VITE_AUDIO_CLOUD_SYNC` is disabled. Update the privacy policy and Data
+  safety form before enabling cloud audio.
+
+Service providers that process data strictly on FretFlow's behalf (hosting,
+CDN/security and transactional email) must still be described in the privacy
+policy. Review Google's current Data safety definitions before deciding whether
+any integration counts as "shared" in the form.
+
+## 6. Policy and signing attestations (manual)
+
+The Play Console account owner must personally review and answer these. Do not
+tick them merely because this file exists.
+
+- Developer Program Policies: review and accept only after the privacy, account
+  deletion, Terms/UGC reporting, target API and store metadata checks pass.
+  - https://play.google/developer-content-policy/
+  - https://playacademy.exceedlms.com/student/activity/10754-google-play
+  - https://support.google.com/googleplay/android-developer/answer/6320428
+- Play App Signing: enrol the new app. Keep the upload keystore and its passwords
+  in a password manager and an encrypted backup; never commit them.
+  - https://developer.android.com/guide/app-bundle
+  - https://play.google/play-app-signing-terms/
+  - https://support.google.com/googleplay/android-developer/answer/9842756?hl=ko
+- US export laws: the app uses standard HTTPS/TLS encryption. Read the current
+  export-compliance wording and make the declaration as the account owner.
+  - https://support.google.com/googleplay/android-developer/answer/113770?hl=ko
+- Intellectual property: FretFlow supports cover-score authoring and unlisted
+  sharing. Keep the Terms acceptance and Report score link, and respond to valid
+  copyright/abuse reports promptly.
+
+## 7. Release gates
+
+- AAB targets API 36 or newer and `versionCode` is higher than every prior upload.
+- Internal-test install opens without a browser address bar.
+- `/.well-known/assetlinks.json` contains both the Play app-signing certificate
+  and (for sideload testing) the upload-key SHA-256 fingerprints.
+- Sign-up, sign-in, magic link, logout and account deletion work on a real device.
+- Deleted accounts lose access and their cloud rows are removed; local-only data
+  behavior matches the privacy policy.
+- Root, privacy, Terms, account deletion, manifest and assetlinks URLs all return
+  HTTP 200 without a challenge page.
+- At least two testers complete the main score creation/edit/play/export flow on
+  different Android devices before closed testing begins.

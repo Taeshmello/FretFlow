@@ -14,6 +14,7 @@ const Editor = lazy(() => import('./screens/Editor').then(m => ({ default: m.Edi
 const SharedScore = lazy(() => import('./screens/SharedScore').then(m => ({ default: m.SharedScore })));
 
 const shareFromHash = () => window.location.hash.match(/^#\/share\/([A-Za-z0-9_-]{43})$/)?.[1] ?? null;
+const accountDeletionRequested = () => new URLSearchParams(window.location.search).get('delete-account') === '1';
 
 const SAVE_LABEL: Record<SaveStatus, string> = {
   idle: '',
@@ -188,7 +189,7 @@ export function App() {
             onBack={back}
             saveLabel={SAVE_LABEL[saveStatus]}
             saveError={saveStatus === 'error'}
-            account={<Account variant="menu" onSignedIn={() => void syncNow()} />}
+            account={<Account variant="menu" requestDelete={accountDeletionRequested()} onSignedIn={() => void syncNow()} />}
           />
         </Suspense>
       ) : (
@@ -208,6 +209,7 @@ export function App() {
           importError={importError}
           account={
             <Account
+              requestDelete={accountDeletionRequested()}
               onSignedIn={() => {
                 track('signed_in');
                 void p?.sync?.pullMissing().then(() => refresh(p)).catch(() => {});
